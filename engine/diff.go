@@ -47,7 +47,12 @@ type DiffResult struct {
 // Diff computes the differences between a local spec and a remote spec.
 func Diff(local, remote *FormSpec, _ *State) *DiffResult {
 	result := &DiffResult{}
+	diffInfo(result, local, remote)
+	diffItems(result, local.Items, remote.Items)
+	return result
+}
 
+func diffInfo(result *DiffResult, local, remote *FormSpec) {
 	if local.Title != remote.Title {
 		result.InfoChanged = true
 		result.InfoDetails = append(result.InfoDetails,
@@ -58,22 +63,24 @@ func Diff(local, remote *FormSpec, _ *State) *DiffResult {
 		result.InfoDetails = append(result.InfoDetails,
 			fmt.Sprintf("  ~ description: %q -> %q", remote.Description, local.Description))
 	}
+}
 
-	for i := range max(len(local.Items), len(remote.Items)) {
+func diffItems(result *DiffResult, local, remote []ItemSpec) {
+	for i := range max(len(local), len(remote)) {
 		switch {
-		case i >= len(local.Items):
-			old := remote.Items[i]
+		case i >= len(local):
+			old := remote[i]
 			result.Changes = append(result.Changes, Change{
 				Type: ChangeDelete, Index: i, Old: &old,
 			})
-		case i >= len(remote.Items):
-			item := local.Items[i]
+		case i >= len(remote):
+			item := local[i]
 			result.Changes = append(result.Changes, Change{
 				Type: ChangeCreate, Index: i, New: &item,
 			})
 		default:
-			old := remote.Items[i]
-			item := local.Items[i]
+			old := remote[i]
+			item := local[i]
 			if !itemsEqual(old, item) {
 				result.Changes = append(result.Changes, Change{
 					Type: ChangeUpdate, Index: i, Old: &old, New: &item,
@@ -81,8 +88,6 @@ func Diff(local, remote *FormSpec, _ *State) *DiffResult {
 			}
 		}
 	}
-
-	return result
 }
 
 // HasChanges reports whether there are any differences.
@@ -134,19 +139,23 @@ func NewFormSummary(spec *FormSpec) string {
 	}
 	lines = append(lines, "")
 	for i, item := range spec.Items {
-		detail := string(item.Type)
-		if item.Choice != nil {
-			detail = fmt.Sprintf("%s/%s [%d options]", item.Type, item.Choice.Type, len(item.Choice.Options))
-		}
-		req := ""
-		if item.Required {
-			req = " *"
-		}
-		lines = append(lines, fmt.Sprintf("  + [%d] %s (%s)%s", i, item.Title, detail, req))
+		lines = append(lines, formatNewItem(i, item))
 	}
 	lines = append(lines, "")
 	lines = append(lines, fmt.Sprintf("合計: %d項目を作成", len(spec.Items)))
 	return strings.Join(lines, "\n")
+}
+
+func formatNewItem(i int, item ItemSpec) string {
+	detail := string(item.Type)
+	if item.Choice != nil {
+		detail = fmt.Sprintf("%s/%s [%d options]", item.Type, item.Choice.Type, len(item.Choice.Options))
+	}
+	req := ""
+	if item.Required {
+		req = " *"
+	}
+	return fmt.Sprintf("  + [%d] %s (%s)%s", i, item.Title, detail, req)
 }
 
 func formatUpdate(c Change) []string {
@@ -171,19 +180,25 @@ func itemsEqual(a, b ItemSpec) bool {
 	if a.Title != b.Title || a.Type != b.Type || a.Required != b.Required || a.Description != b.Description {
 		return false
 	}
-	if (a.Choice == nil) != (b.Choice == nil) {
+	return choiceEqual(a.Choice, b.Choice) && scaleEqual(a.Scale, b.Scale)
+}
+
+func choiceEqual(a, b *ChoiceSpec) bool {
+	if (a == nil) != (b == nil) {
 		return false
 	}
-	if a.Choice != nil {
-		if a.Choice.Type != b.Choice.Type || !slices.Equal(a.Choice.Options, b.Choice.Options) {
-			return false
-		}
+	if a == nil {
+		return true
 	}
-	if (a.Scale == nil) != (b.Scale == nil) {
+	return a.Type == b.Type && slices.Equal(a.Options, b.Options)
+}
+
+func scaleEqual(a, b *ScaleSpec) bool {
+	if (a == nil) != (b == nil) {
 		return false
 	}
-	if a.Scale != nil && *a.Scale != *b.Scale {
-		return false
+	if a == nil {
+		return true
 	}
-	return true
+	return *a == *b
 }

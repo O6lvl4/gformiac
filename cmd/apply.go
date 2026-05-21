@@ -29,7 +29,6 @@ func runApply(cmd *cobra.Command, args []string) error {
 	if err != nil {
 		return err
 	}
-
 	if err := engine.Validate(spec); err != nil {
 		return err
 	}
@@ -40,7 +39,6 @@ func runApply(cmd *cobra.Command, args []string) error {
 	}
 
 	ctx := context.Background()
-
 	if state == nil {
 		return applyNew(ctx, spec)
 	}
@@ -49,7 +47,6 @@ func runApply(cmd *cobra.Command, args []string) error {
 
 func applyNew(ctx context.Context, spec *engine.FormSpec) error {
 	fmt.Println(engine.NewFormSummary(spec))
-
 	if !autoApprove && !confirm("適用しますか？") {
 		fmt.Println("キャンセルしました")
 		return nil
@@ -61,22 +58,12 @@ func applyNew(ctx context.Context, spec *engine.FormSpec) error {
 	}
 
 	fmt.Println("フォーム作成中...")
-
 	state, err := client.CreateForm(ctx, spec)
 	if err != nil {
 		return err
 	}
 
-	if err := engine.SaveState(stateFile, state); err != nil {
-		return fmt.Errorf("状態保存失敗: %w", err)
-	}
-
-	fmt.Println()
-	fmt.Println("適用完了!")
-	fmt.Printf("  フォームID:  %s\n", state.FormID)
-	fmt.Printf("  回答URL:     %s\n", state.ResponderURL)
-	fmt.Printf("  状態ファイル: %s\n", stateFile)
-	return nil
+	return saveAndReport(state)
 }
 
 func applyUpdate(ctx context.Context, spec *engine.FormSpec, state *engine.State) error {
@@ -89,29 +76,46 @@ func applyUpdate(ctx context.Context, spec *engine.FormSpec, state *engine.State
 	if err != nil {
 		return err
 	}
-
 	if !diff.HasChanges() {
 		fmt.Println("変更なし — フォームは最新です")
 		return nil
 	}
-
-	fmt.Println(diff.String())
-
-	if !autoApprove && !confirm("\n適用しますか？") {
-		fmt.Println("キャンセルしました")
+	if !confirmDiff(diff) {
 		return nil
 	}
 
-	newState, err := client.UpdateForm(ctx, state.FormID, spec)
+	return executeUpdate(ctx, client, state.FormID, spec)
+}
+
+func executeUpdate(ctx context.Context, client *engine.Client, formID string, spec *engine.FormSpec) error {
+	newState, err := client.UpdateForm(ctx, formID, spec)
 	if err != nil {
 		return err
 	}
+	return saveAndReport(newState)
+}
 
-	if err := engine.SaveState(stateFile, newState); err != nil {
+func confirmDiff(diff *engine.DiffResult) bool {
+	fmt.Println(diff.String())
+	if autoApprove {
+		return true
+	}
+	if !confirm("\n適用しますか？") {
+		fmt.Println("キャンセルしました")
+		return false
+	}
+	return true
+}
+
+func saveAndReport(state *engine.State) error {
+	if err := engine.SaveState(stateFile, state); err != nil {
 		return fmt.Errorf("状態保存失敗: %w", err)
 	}
-
-	fmt.Println("\n適用完了!")
+	fmt.Println()
+	fmt.Println("適用完了!")
+	fmt.Printf("  フォームID:  %s\n", state.FormID)
+	fmt.Printf("  回答URL:     %s\n", state.ResponderURL)
+	fmt.Printf("  状態ファイル: %s\n", stateFile)
 	return nil
 }
 

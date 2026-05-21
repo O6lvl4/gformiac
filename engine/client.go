@@ -25,15 +25,27 @@ type Client struct {
 }
 
 // NewClient creates an authenticated Forms API client.
-// It tries Application Default Credentials first, then falls back to an OAuth2 flow
-// using the provided credentials file.
+// It tries Application Default Credentials first, then falls back to an OAuth2 flow.
 func NewClient(ctx context.Context, credentialsFile, tokenFile string) (*Client, error) {
-	if ts, err := google.DefaultTokenSource(ctx, formsScope); err == nil {
-		if svc, err := forms.NewService(ctx, option.WithTokenSource(ts)); err == nil {
-			return &Client{svc: svc}, nil
-		}
+	if client, err := tryDefaultCredentials(ctx); err == nil {
+		return client, nil
 	}
+	return newOAuth2Client(ctx, credentialsFile, tokenFile)
+}
 
+func tryDefaultCredentials(ctx context.Context) (*Client, error) {
+	ts, err := google.DefaultTokenSource(ctx, formsScope)
+	if err != nil {
+		return nil, err
+	}
+	svc, err := forms.NewService(ctx, option.WithTokenSource(ts))
+	if err != nil {
+		return nil, err
+	}
+	return &Client{svc: svc}, nil
+}
+
+func newOAuth2Client(ctx context.Context, credentialsFile, tokenFile string) (*Client, error) {
 	b, err := os.ReadFile(credentialsFile)
 	if err != nil {
 		return nil, fmt.Errorf(
@@ -47,15 +59,9 @@ func NewClient(ctx context.Context, credentialsFile, tokenFile string) (*Client,
 		return nil, fmt.Errorf("credentials解析失敗: %w", err)
 	}
 
-	tok, err := tokenFromFile(tokenFile)
+	tok, err := resolveToken(ctx, config, tokenFile)
 	if err != nil {
-		tok, err = tokenFromWeb(ctx, config)
-		if err != nil {
-			return nil, fmt.Errorf("認証失敗: %w", err)
-		}
-		if err := saveToken(tokenFile, tok); err != nil {
-			return nil, fmt.Errorf("トークン保存失敗: %w", err)
-		}
+		return nil, err
 	}
 
 	svc, err := forms.NewService(ctx, option.WithHTTPClient(config.Client(ctx, tok)))
@@ -63,6 +69,20 @@ func NewClient(ctx context.Context, credentialsFile, tokenFile string) (*Client,
 		return nil, fmt.Errorf("Forms API初期化失敗: %w", err)
 	}
 	return &Client{svc: svc}, nil
+}
+
+func resolveToken(ctx context.Context, config *oauth2.Config, tokenFile string) (*oauth2.Token, error) {
+	if tok, err := tokenFromFile(tokenFile); err == nil {
+		return tok, nil
+	}
+	tok, err := tokenFromWeb(ctx, config)
+	if err != nil {
+		return nil, fmt.Errorf("認証失敗: %w", err)
+	}
+	if err := saveToken(tokenFile, tok); err != nil {
+		return nil, fmt.Errorf("トークン保存失敗: %w", err)
+	}
+	return tok, nil
 }
 
 // Plan fetches the remote form and computes the diff against the local spec.
@@ -91,11 +111,7 @@ func (c *Client) CreateForm(ctx context.Context, spec *FormSpec) (*State, error)
 		}
 	}
 
-	form, err = c.svc.Forms.Get(form.FormId).Context(ctx).Do()
-	if err != nil {
-		return nil, fmt.Errorf("フォーム取得失敗: %w", err)
-	}
-	return buildState(form), nil
+	return c.fetchState(ctx, form.FormId)
 }
 
 // UpdateForm reconciles the remote form to match the local spec.
@@ -113,11 +129,7 @@ func (c *Client) UpdateForm(ctx context.Context, formID string, spec *FormSpec) 
 		}
 	}
 
-	form, err = c.svc.Forms.Get(formID).Context(ctx).Do()
-	if err != nil {
-		return nil, fmt.Errorf("フォーム取得失敗: %w", err)
-	}
-	return buildState(form), nil
+	return c.fetchState(ctx, formID)
 }
 
 // ImportForm fetches a remote form and converts it to a FormSpec and State.
@@ -127,6 +139,14 @@ func (c *Client) ImportForm(ctx context.Context, formID string) (*FormSpec, *Sta
 		return nil, nil, fmt.Errorf("フォーム取得失敗: %w", err)
 	}
 	return formToSpec(form), buildState(form), nil
+}
+
+func (c *Client) fetchState(ctx context.Context, formID string) (*State, error) {
+	form, err := c.svc.Forms.Get(formID).Context(ctx).Do()
+	if err != nil {
+		return nil, fmt.Errorf("フォーム取得失敗: %w", err)
+	}
+	return buildState(form), nil
 }
 
 func tokenFromWeb(ctx context.Context, config *oauth2.Config) (*oauth2.Token, error) {
@@ -139,9 +159,19 @@ func tokenFromWeb(ctx context.Context, config *oauth2.Config) (*oauth2.Token, er
 
 	codeCh := make(chan string, 1)
 	errCh := make(chan error, 1)
+	srv := &http.Server{Handler: callbackHandler(codeCh, errCh)}
+	go srv.Serve(listener)
+	defer srv.Close()
 
-	mux := http.NewServeMux()
-	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+	authURL := config.AuthCodeURL("state-token", oauth2.AccessTypeOffline)
+	fmt.Println("ブラウザで認証してください...")
+	openBrowser(authURL)
+
+	return waitForToken(ctx, config, codeCh, errCh)
+}
+
+func callbackHandler(codeCh chan<- string, errCh chan<- error) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		code := r.URL.Query().Get("code")
 		w.Header().Set("Content-Type", "text/html; charset=utf-8")
 		if code == "" {
@@ -152,15 +182,9 @@ func tokenFromWeb(ctx context.Context, config *oauth2.Config) (*oauth2.Token, er
 		fmt.Fprintln(w, "<h2>認証成功!</h2><p>このタブを閉じてターミナルに戻ってください。</p>")
 		codeCh <- code
 	})
+}
 
-	srv := &http.Server{Handler: mux}
-	go srv.Serve(listener)
-	defer srv.Close()
-
-	authURL := config.AuthCodeURL("state-token", oauth2.AccessTypeOffline)
-	fmt.Println("ブラウザで認証してください...")
-	openBrowser(authURL)
-
+func waitForToken(ctx context.Context, config *oauth2.Config, codeCh <-chan string, errCh <-chan error) (*oauth2.Token, error) {
 	select {
 	case code := <-codeCh:
 		return config.Exchange(ctx, code)

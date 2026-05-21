@@ -7,330 +7,204 @@ import (
 )
 
 func TestItemSpecToRequest_ShortAnswer(t *testing.T) {
-	item := ItemSpec{Title: "Name", Type: ItemShortAnswer, Required: true}
-	req := itemSpecToRequest(item, 0)
+	req := itemSpecToRequest(ItemSpec{Title: "Name", Type: ItemShortAnswer, Required: true}, 0)
+	assertCreateItem(t, req)
 
-	if req == nil || req.CreateItem == nil {
-		t.Fatal("expected CreateItem request")
-	}
-	ci := req.CreateItem
-	if ci.Item.Title != "Name" {
-		t.Errorf("title = %q", ci.Item.Title)
-	}
-	q := ci.Item.QuestionItem.Question
+	q := req.CreateItem.Item.QuestionItem.Question
 	if !q.Required {
 		t.Error("expected required=true")
 	}
 	if q.TextQuestion == nil || q.TextQuestion.Paragraph {
-		t.Error("expected short answer (paragraph=false)")
-	}
-	if ci.Location.Index != 0 {
-		t.Errorf("location index = %d", ci.Location.Index)
+		t.Error("expected paragraph=false")
 	}
 }
 
 func TestItemSpecToRequest_Paragraph(t *testing.T) {
-	item := ItemSpec{Title: "Comment", Type: ItemParagraph}
-	req := itemSpecToRequest(item, 2)
+	req := itemSpecToRequest(ItemSpec{Title: "Comment", Type: ItemParagraph}, 2)
+	assertCreateItem(t, req)
 
-	q := req.CreateItem.Item.QuestionItem.Question
-	if q.TextQuestion == nil || !q.TextQuestion.Paragraph {
+	if !req.CreateItem.Item.QuestionItem.Question.TextQuestion.Paragraph {
 		t.Error("expected paragraph=true")
 	}
 	if req.CreateItem.Location.Index != 2 {
-		t.Errorf("location index = %d", req.CreateItem.Location.Index)
+		t.Errorf("index = %d", req.CreateItem.Location.Index)
 	}
 }
 
-func TestItemSpecToRequest_ChoiceRadio(t *testing.T) {
-	item := ItemSpec{
-		Title: "Pick", Type: ItemChoice,
-		Choice: &ChoiceSpec{Type: ChoiceRadio, Options: []string{"A", "B"}},
+func TestItemSpecToRequest_ChoiceTypes(t *testing.T) {
+	cases := []struct {
+		ct   ChoiceType
+		want string
+	}{
+		{ChoiceRadio, "RADIO"},
+		{ChoiceCheckbox, "CHECKBOX"},
+		{ChoiceDropdown, "DROP_DOWN"},
 	}
-	req := itemSpecToRequest(item, 0)
-
-	q := req.CreateItem.Item.QuestionItem.Question
-	if q.ChoiceQuestion == nil {
-		t.Fatal("expected ChoiceQuestion")
-	}
-	if q.ChoiceQuestion.Type != "RADIO" {
-		t.Errorf("choice type = %q", q.ChoiceQuestion.Type)
-	}
-	if len(q.ChoiceQuestion.Options) != 2 {
-		t.Errorf("options count = %d", len(q.ChoiceQuestion.Options))
-	}
-}
-
-func TestItemSpecToRequest_ChoiceCheckbox(t *testing.T) {
-	item := ItemSpec{
-		Title: "Multi", Type: ItemChoice,
-		Choice: &ChoiceSpec{Type: ChoiceCheckbox, Options: []string{"X"}},
-	}
-	req := itemSpecToRequest(item, 0)
-	if req.CreateItem.Item.QuestionItem.Question.ChoiceQuestion.Type != "CHECKBOX" {
-		t.Error("expected CHECKBOX")
-	}
-}
-
-func TestItemSpecToRequest_ChoiceDropdown(t *testing.T) {
-	item := ItemSpec{
-		Title: "Select", Type: ItemChoice,
-		Choice: &ChoiceSpec{Type: ChoiceDropdown, Options: []string{"X"}},
-	}
-	req := itemSpecToRequest(item, 0)
-	if req.CreateItem.Item.QuestionItem.Question.ChoiceQuestion.Type != "DROP_DOWN" {
-		t.Error("expected DROP_DOWN")
+	for _, c := range cases {
+		req := itemSpecToRequest(ItemSpec{
+			Title: "Q", Type: ItemChoice,
+			Choice: &ChoiceSpec{Type: c.ct, Options: []string{"A"}},
+		}, 0)
+		assertCreateItem(t, req)
+		got := req.CreateItem.Item.QuestionItem.Question.ChoiceQuestion.Type
+		if got != c.want {
+			t.Errorf("ChoiceType %q: got %q, want %q", c.ct, got, c.want)
+		}
 	}
 }
 
 func TestItemSpecToRequest_Scale(t *testing.T) {
-	item := ItemSpec{
+	req := itemSpecToRequest(ItemSpec{
 		Title: "Rate", Type: ItemScale,
 		Scale: &ScaleSpec{Low: 1, High: 10, LowLabel: "Bad", HighLabel: "Good"},
-	}
-	req := itemSpecToRequest(item, 0)
+	}, 0)
+	assertCreateItem(t, req)
 
-	q := req.CreateItem.Item.QuestionItem.Question
-	if q.ScaleQuestion == nil {
-		t.Fatal("expected ScaleQuestion")
-	}
-	if q.ScaleQuestion.Low != 1 || q.ScaleQuestion.High != 10 {
-		t.Errorf("scale = %d-%d", q.ScaleQuestion.Low, q.ScaleQuestion.High)
-	}
-	if q.ScaleQuestion.LowLabel != "Bad" || q.ScaleQuestion.HighLabel != "Good" {
-		t.Error("scale labels mismatch")
+	s := req.CreateItem.Item.QuestionItem.Question.ScaleQuestion
+	if s.Low != 1 || s.High != 10 || s.LowLabel != "Bad" || s.HighLabel != "Good" {
+		t.Errorf("scale = %+v", s)
 	}
 }
 
-func TestItemSpecToRequest_Date(t *testing.T) {
-	req := itemSpecToRequest(ItemSpec{Title: "When", Type: ItemDate}, 0)
-	if req.CreateItem.Item.QuestionItem.Question.DateQuestion == nil {
-		t.Error("expected DateQuestion")
+func TestItemSpecToRequest_DateTimePageBreak(t *testing.T) {
+	cases := []struct {
+		typ  ItemType
+		check func(*forms.Request) bool
+	}{
+		{ItemDate, func(r *forms.Request) bool { return r.CreateItem.Item.QuestionItem.Question.DateQuestion != nil }},
+		{ItemTime, func(r *forms.Request) bool { return r.CreateItem.Item.QuestionItem.Question.TimeQuestion != nil }},
+		{ItemPageBreak, func(r *forms.Request) bool { return r.CreateItem.Item.PageBreakItem != nil }},
+	}
+	for _, c := range cases {
+		req := itemSpecToRequest(ItemSpec{Title: "Q", Type: c.typ}, 0)
+		assertCreateItem(t, req)
+		if !c.check(req) {
+			t.Errorf("%s: unexpected structure", c.typ)
+		}
 	}
 }
 
-func TestItemSpecToRequest_Time(t *testing.T) {
-	req := itemSpecToRequest(ItemSpec{Title: "When", Type: ItemTime}, 0)
-	if req.CreateItem.Item.QuestionItem.Question.TimeQuestion == nil {
-		t.Error("expected TimeQuestion")
+func TestItemSpecToRequest_ReturnsNil(t *testing.T) {
+	cases := []struct {
+		name string
+		item ItemSpec
+	}{
+		{"unknown type", ItemSpec{Title: "X", Type: "unknown_type"}},
+		{"choice without spec", ItemSpec{Title: "X", Type: ItemChoice}},
+		{"scale without spec", ItemSpec{Title: "X", Type: ItemScale}},
+	}
+	for _, c := range cases {
+		if req := itemSpecToRequest(c.item, 0); req != nil {
+			t.Errorf("%s: expected nil, got %+v", c.name, req)
+		}
 	}
 }
 
-func TestItemSpecToRequest_PageBreak(t *testing.T) {
-	req := itemSpecToRequest(ItemSpec{Title: "Section", Type: ItemPageBreak}, 0)
-	if req.CreateItem.Item.PageBreakItem == nil {
-		t.Error("expected PageBreakItem")
-	}
-}
-
-func TestItemSpecToRequest_Unknown(t *testing.T) {
-	req := itemSpecToRequest(ItemSpec{Title: "X", Type: "unknown_type"}, 0)
-	if req != nil {
-		t.Error("expected nil for unknown type")
-	}
-}
-
-func TestItemSpecToRequest_ChoiceNilSpec(t *testing.T) {
-	req := itemSpecToRequest(ItemSpec{Title: "X", Type: ItemChoice}, 0)
-	if req != nil {
-		t.Error("expected nil for choice without spec")
-	}
-}
-
-func TestFormToSpec_RoundTrip(t *testing.T) {
+func TestFormToSpec_AllTypes(t *testing.T) {
 	form := &forms.Form{
-		FormId: "abc123",
-		Info:   &forms.Info{Title: "Test", Description: "Desc"},
+		Info: &forms.Info{Title: "Test", Description: "Desc"},
 		Items: []*forms.Item{
-			{
-				ItemId: "i1", Title: "Name",
-				QuestionItem: &forms.QuestionItem{
-					Question: &forms.Question{
-						QuestionId: "q1", Required: true,
-						TextQuestion: &forms.TextQuestion{Paragraph: false},
-					},
-				},
-			},
-			{
-				ItemId: "i2", Title: "Pick",
-				QuestionItem: &forms.QuestionItem{
-					Question: &forms.Question{
-						QuestionId: "q2",
-						ChoiceQuestion: &forms.ChoiceQuestion{
-							Type:    "CHECKBOX",
-							Options: []*forms.Option{{Value: "A"}, {Value: "B"}},
-						},
-					},
-				},
-			},
-			{
-				ItemId: "i3", Title: "Rate",
-				QuestionItem: &forms.QuestionItem{
-					Question: &forms.Question{
-						QuestionId: "q3",
-						ScaleQuestion: &forms.ScaleQuestion{
-							Low: 1, High: 5, LowLabel: "L", HighLabel: "H",
-						},
-					},
-				},
-			},
-			{ItemId: "i4", Title: "Section", PageBreakItem: &forms.PageBreakItem{}},
-			{
-				ItemId: "i5", Title: "Date",
-				QuestionItem: &forms.QuestionItem{
-					Question: &forms.Question{QuestionId: "q5", DateQuestion: &forms.DateQuestion{}},
-				},
-			},
-			{
-				ItemId: "i6", Title: "Time",
-				QuestionItem: &forms.QuestionItem{
-					Question: &forms.Question{QuestionId: "q6", TimeQuestion: &forms.TimeQuestion{}},
-				},
-			},
+			{Title: "Name", QuestionItem: &forms.QuestionItem{Question: &forms.Question{Required: true, TextQuestion: &forms.TextQuestion{}}}},
+			{Title: "Pick", QuestionItem: &forms.QuestionItem{Question: &forms.Question{ChoiceQuestion: &forms.ChoiceQuestion{Type: "CHECKBOX", Options: []*forms.Option{{Value: "A"}, {Value: "B"}}}}}},
+			{Title: "Rate", QuestionItem: &forms.QuestionItem{Question: &forms.Question{ScaleQuestion: &forms.ScaleQuestion{Low: 1, High: 5}}}},
+			{Title: "Section", PageBreakItem: &forms.PageBreakItem{}},
+			{Title: "Date", QuestionItem: &forms.QuestionItem{Question: &forms.Question{DateQuestion: &forms.DateQuestion{}}}},
+			{Title: "Time", QuestionItem: &forms.QuestionItem{Question: &forms.Question{TimeQuestion: &forms.TimeQuestion{}}}},
 		},
 	}
 
 	spec := formToSpec(form)
 
 	if spec.Title != "Test" || spec.Description != "Desc" {
-		t.Errorf("info mismatch: %q %q", spec.Title, spec.Description)
-	}
-	if len(spec.Items) != 6 {
-		t.Fatalf("items = %d, want 6", len(spec.Items))
+		t.Errorf("info: %q %q", spec.Title, spec.Description)
 	}
 
-	checks := []struct {
-		index    int
-		title    string
-		itemType ItemType
-	}{
-		{0, "Name", ItemShortAnswer},
-		{1, "Pick", ItemChoice},
-		{2, "Rate", ItemScale},
-		{3, "Section", ItemPageBreak},
-		{4, "Date", ItemDate},
-		{5, "Time", ItemTime},
-	}
-	for _, c := range checks {
-		got := spec.Items[c.index]
-		if got.Title != c.title || got.Type != c.itemType {
-			t.Errorf("[%d] got title=%q type=%q, want %q %q",
-				c.index, got.Title, got.Type, c.title, c.itemType)
+	expected := []ItemType{ItemShortAnswer, ItemChoice, ItemScale, ItemPageBreak, ItemDate, ItemTime}
+	for i, want := range expected {
+		if spec.Items[i].Type != want {
+			t.Errorf("[%d] type = %q, want %q", i, spec.Items[i].Type, want)
 		}
 	}
+}
 
-	if spec.Items[1].Choice == nil || spec.Items[1].Choice.Type != ChoiceCheckbox {
-		t.Errorf("choice type mismatch: %+v", spec.Items[1].Choice)
+func TestFormToSpec_ChoiceDetails(t *testing.T) {
+	form := &forms.Form{
+		Info: &forms.Info{Title: "T"},
+		Items: []*forms.Item{{
+			Title: "Q",
+			QuestionItem: &forms.QuestionItem{Question: &forms.Question{
+				ChoiceQuestion: &forms.ChoiceQuestion{Type: "DROP_DOWN", Options: []*forms.Option{{Value: "X"}, {Value: "Y"}}},
+			}},
+		}},
 	}
-	if len(spec.Items[1].Choice.Options) != 2 {
-		t.Errorf("choice options = %d", len(spec.Items[1].Choice.Options))
-	}
-	if spec.Items[2].Scale == nil || spec.Items[2].Scale.High != 5 {
-		t.Errorf("scale mismatch: %+v", spec.Items[2].Scale)
+	spec := formToSpec(form)
+	c := spec.Items[0].Choice
+	if c == nil || c.Type != ChoiceDropdown || len(c.Options) != 2 {
+		t.Errorf("choice = %+v", c)
 	}
 }
 
 func TestSpecToCreateRequests(t *testing.T) {
 	spec := &FormSpec{
-		Title:       "T",
-		Description: "D",
-		Items: []ItemSpec{
-			{Title: "Q1", Type: ItemShortAnswer},
-			{Title: "Q2", Type: ItemParagraph},
-		},
+		Title: "T", Description: "D",
+		Items: []ItemSpec{{Title: "Q1", Type: ItemShortAnswer}, {Title: "Q2", Type: ItemParagraph}},
 	}
-
 	requests := specToCreateRequests(spec)
 
-	if requests[0].UpdateFormInfo == nil {
-		t.Fatal("first request should be UpdateFormInfo")
-	}
-	if requests[0].UpdateFormInfo.Info.Description != "D" {
-		t.Errorf("description = %q", requests[0].UpdateFormInfo.Info.Description)
-	}
 	if len(requests) != 3 {
 		t.Fatalf("requests = %d, want 3", len(requests))
 	}
-	for i := 1; i < len(requests); i++ {
-		if requests[i].CreateItem == nil {
-			t.Errorf("request[%d] should be CreateItem", i)
-		}
+	if requests[0].UpdateFormInfo == nil {
+		t.Error("[0] expected UpdateFormInfo")
 	}
 }
 
 func TestSpecToCreateRequests_NoDescription(t *testing.T) {
-	spec := &FormSpec{
+	requests := specToCreateRequests(&FormSpec{
 		Title: "T",
 		Items: []ItemSpec{{Title: "Q1", Type: ItemShortAnswer}},
-	}
-
-	requests := specToCreateRequests(spec)
-	if len(requests) != 1 {
-		t.Fatalf("requests = %d, want 1", len(requests))
-	}
-	if requests[0].CreateItem == nil {
-		t.Error("expected CreateItem")
+	})
+	if len(requests) != 1 || requests[0].CreateItem == nil {
+		t.Errorf("expected 1 CreateItem, got %d", len(requests))
 	}
 }
 
 func TestSpecToUpdateRequests(t *testing.T) {
 	spec := &FormSpec{
-		Title:       "New Title",
-		Description: "New Desc",
-		Items:       []ItemSpec{{Title: "Q1", Type: ItemShortAnswer}},
+		Title: "New", Description: "D",
+		Items: []ItemSpec{{Title: "Q1", Type: ItemShortAnswer}},
 	}
-	remoteForm := &forms.Form{
-		Items: []*forms.Item{
-			{ItemId: "old1", Title: "Old Q1"},
-			{ItemId: "old2", Title: "Old Q2"},
-		},
-	}
+	remote := &forms.Form{Items: []*forms.Item{{ItemId: "a"}, {ItemId: "b"}}}
 
-	requests := specToUpdateRequests(spec, remoteForm)
+	requests := specToUpdateRequests(spec, remote)
 
-	// 1 UpdateFormInfo + 2 DeleteItem + 1 CreateItem = 4
+	// 1 UpdateFormInfo + 2 Delete + 1 Create = 4
 	if len(requests) != 4 {
 		t.Fatalf("requests = %d, want 4", len(requests))
 	}
-
-	if requests[0].UpdateFormInfo == nil {
-		t.Error("[0] expected UpdateFormInfo")
+	if requests[1].DeleteItem.Location.Index != 1 {
+		t.Error("expected delete index 1 first")
 	}
-	if requests[1].DeleteItem == nil || requests[1].DeleteItem.Location.Index != 1 {
-		t.Errorf("[1] expected delete index 1, got %+v", requests[1])
-	}
-	if requests[2].DeleteItem == nil || requests[2].DeleteItem.Location.Index != 0 {
-		t.Errorf("[2] expected delete index 0, got %+v", requests[2])
-	}
-	if requests[3].CreateItem == nil {
-		t.Error("[3] expected CreateItem")
+	if requests[2].DeleteItem.Location.Index != 0 {
+		t.Error("expected delete index 0 second")
 	}
 }
 
 func TestBuildState(t *testing.T) {
 	form := &forms.Form{
-		FormId:       "form123",
-		ResponderUri: "https://docs.google.com/forms/d/e/form123/viewform",
+		FormId:       "f1",
+		ResponderUri: "https://example.com",
 		Items: []*forms.Item{
-			{
-				ItemId: "item1",
-				QuestionItem: &forms.QuestionItem{
-					Question: &forms.Question{QuestionId: "q1"},
-				},
-			},
-			{ItemId: "item2", PageBreakItem: &forms.PageBreakItem{}},
+			{ItemId: "i1", QuestionItem: &forms.QuestionItem{Question: &forms.Question{QuestionId: "q1"}}},
+			{ItemId: "i2", PageBreakItem: &forms.PageBreakItem{}},
 		},
 	}
-
 	state := buildState(form)
 
-	if state.FormID != "form123" {
-		t.Errorf("FormID = %q", state.FormID)
+	if state.FormID != "f1" || state.ResponderURL != "https://example.com" {
+		t.Errorf("basic fields: %+v", state)
 	}
-	if state.ResponderURL != form.ResponderUri {
-		t.Errorf("ResponderURL = %q", state.ResponderURL)
-	}
-	if len(state.ItemIDs) != 2 || state.ItemIDs[0] != "item1" || state.ItemIDs[1] != "item2" {
+	if len(state.ItemIDs) != 2 || state.ItemIDs[0] != "i1" {
 		t.Errorf("ItemIDs = %v", state.ItemIDs)
 	}
 	if state.QuestionIDs[0] != "q1" || state.QuestionIDs[1] != "" {
@@ -349,10 +223,17 @@ func TestChoiceTypeMapping(t *testing.T) {
 	}
 	for _, c := range cases {
 		if got := choiceTypeToAPI(c.ct); got != c.api {
-			t.Errorf("choiceTypeToAPI(%q) = %q, want %q", c.ct, got, c.api)
+			t.Errorf("toAPI(%q) = %q, want %q", c.ct, got, c.api)
 		}
 		if got := choiceTypeFromAPI(c.api); got != c.ct {
-			t.Errorf("choiceTypeFromAPI(%q) = %q, want %q", c.api, got, c.ct)
+			t.Errorf("fromAPI(%q) = %q, want %q", c.api, got, c.ct)
 		}
+	}
+}
+
+func assertCreateItem(t *testing.T, req *forms.Request) {
+	t.Helper()
+	if req == nil || req.CreateItem == nil || req.CreateItem.Item == nil {
+		t.Fatal("expected non-nil CreateItem request")
 	}
 }

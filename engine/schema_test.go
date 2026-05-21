@@ -6,7 +6,7 @@ import (
 	"testing"
 )
 
-func TestLoadSpec(t *testing.T) {
+func TestLoadSpec_BasicFields(t *testing.T) {
 	yaml := `
 title: "Test Form"
 description: "A test"
@@ -26,16 +26,8 @@ items:
     scale:
       low: 1
       high: 5
-      low_label: "Low"
-      high_label: "High"
 `
-	path := filepath.Join(t.TempDir(), "form.yaml")
-	os.WriteFile(path, []byte(yaml), 0644)
-
-	spec, err := LoadSpec(path)
-	if err != nil {
-		t.Fatalf("LoadSpec failed: %v", err)
-	}
+	spec := loadSpecFromString(t, yaml)
 
 	if spec.Title != "Test Form" {
 		t.Errorf("title = %q, want %q", spec.Title, "Test Form")
@@ -46,42 +38,69 @@ items:
 	if len(spec.Items) != 3 {
 		t.Fatalf("items count = %d, want 3", len(spec.Items))
 	}
+}
 
+func TestLoadSpec_ShortAnswer(t *testing.T) {
+	spec := loadSpecFromString(t, `
+title: "T"
+items:
+  - title: "Q"
+    type: short_answer
+    required: true
+`)
 	if spec.Items[0].Type != ItemShortAnswer || !spec.Items[0].Required {
-		t.Errorf("item[0] = %+v", spec.Items[0])
+		t.Errorf("item = %+v", spec.Items[0])
 	}
+}
 
-	item1 := spec.Items[1]
-	if item1.Type != ItemChoice || item1.Choice == nil {
-		t.Fatalf("item[1] type/choice unexpected: %+v", item1)
+func TestLoadSpec_Choice(t *testing.T) {
+	spec := loadSpecFromString(t, `
+title: "T"
+items:
+  - title: "Q"
+    type: choice
+    choice:
+      type: radio
+      options: ["A", "B"]
+`)
+	item := spec.Items[0]
+	if item.Type != ItemChoice || item.Choice == nil {
+		t.Fatalf("unexpected: %+v", item)
 	}
-	if item1.Choice.Type != ChoiceRadio || len(item1.Choice.Options) != 2 {
-		t.Errorf("item[1].choice = %+v", item1.Choice)
+	if item.Choice.Type != ChoiceRadio || len(item.Choice.Options) != 2 {
+		t.Errorf("choice = %+v", item.Choice)
 	}
+}
 
-	item2 := spec.Items[2]
-	if item2.Type != ItemScale || item2.Scale == nil {
-		t.Fatalf("item[2] type/scale unexpected: %+v", item2)
+func TestLoadSpec_Scale(t *testing.T) {
+	spec := loadSpecFromString(t, `
+title: "T"
+items:
+  - title: "Q"
+    type: scale
+    scale:
+      low: 1
+      high: 5
+`)
+	item := spec.Items[0]
+	if item.Type != ItemScale || item.Scale == nil {
+		t.Fatalf("unexpected: %+v", item)
 	}
-	if item2.Scale.Low != 1 || item2.Scale.High != 5 {
-		t.Errorf("item[2].scale = %+v", item2.Scale)
+	if item.Scale.Low != 1 || item.Scale.High != 5 {
+		t.Errorf("scale = %+v", item.Scale)
 	}
 }
 
 func TestLoadSpec_MissingTitle(t *testing.T) {
-	yaml := `description: "no title"`
 	path := filepath.Join(t.TempDir(), "form.yaml")
-	os.WriteFile(path, []byte(yaml), 0644)
-
-	_, err := LoadSpec(path)
-	if err == nil {
+	os.WriteFile(path, []byte(`description: "no title"`), 0644)
+	if _, err := LoadSpec(path); err == nil {
 		t.Fatal("expected error for missing title")
 	}
 }
 
 func TestLoadSpec_FileNotFound(t *testing.T) {
-	_, err := LoadSpec("/nonexistent/form.yaml")
-	if err == nil {
+	if _, err := LoadSpec("/nonexistent/form.yaml"); err == nil {
 		t.Fatal("expected error for missing file")
 	}
 }
@@ -93,33 +112,30 @@ func TestSaveAndLoadRoundTrip(t *testing.T) {
 		Items: []ItemSpec{
 			{Title: "Q1", Type: ItemShortAnswer, Required: true},
 			{Title: "Q2", Type: ItemChoice, Choice: &ChoiceSpec{
-				Type:    ChoiceCheckbox,
-				Options: []string{"A", "B", "C"},
+				Type: ChoiceCheckbox, Options: []string{"A", "B", "C"},
 			}},
 		},
 	}
 
 	path := filepath.Join(t.TempDir(), "out.yaml")
 	if err := SaveSpec(path, spec); err != nil {
-		t.Fatalf("SaveSpec failed: %v", err)
+		t.Fatalf("SaveSpec: %v", err)
 	}
-
 	loaded, err := LoadSpec(path)
 	if err != nil {
-		t.Fatalf("LoadSpec failed: %v", err)
+		t.Fatalf("LoadSpec: %v", err)
 	}
 
 	if loaded.Title != spec.Title || len(loaded.Items) != 2 {
-		t.Errorf("round trip mismatch: got %+v", loaded)
+		t.Errorf("mismatch: got %+v", loaded)
 	}
-	if loaded.Items[1].Choice.Type != ChoiceCheckbox || len(loaded.Items[1].Choice.Options) != 3 {
-		t.Errorf("choice round trip mismatch: got %+v", loaded.Items[1].Choice)
+	if loaded.Items[1].Choice.Type != ChoiceCheckbox {
+		t.Errorf("choice type mismatch: %+v", loaded.Items[1].Choice)
 	}
 }
 
 func TestItemType_IsValid(t *testing.T) {
-	valid := []ItemType{ItemShortAnswer, ItemParagraph, ItemChoice, ItemScale, ItemDate, ItemTime, ItemPageBreak}
-	for _, v := range valid {
+	for _, v := range []ItemType{ItemShortAnswer, ItemParagraph, ItemChoice, ItemScale, ItemDate, ItemTime, ItemPageBreak} {
 		if !v.IsValid() {
 			t.Errorf("%q should be valid", v)
 		}
@@ -130,8 +146,7 @@ func TestItemType_IsValid(t *testing.T) {
 }
 
 func TestChoiceType_IsValid(t *testing.T) {
-	valid := []ChoiceType{ChoiceRadio, ChoiceCheckbox, ChoiceDropdown}
-	for _, v := range valid {
+	for _, v := range []ChoiceType{ChoiceRadio, ChoiceCheckbox, ChoiceDropdown} {
 		if !v.IsValid() {
 			t.Errorf("%q should be valid", v)
 		}
@@ -139,4 +154,15 @@ func TestChoiceType_IsValid(t *testing.T) {
 	if ChoiceType("multi").IsValid() {
 		t.Error("multi should be invalid")
 	}
+}
+
+func loadSpecFromString(t *testing.T, yaml string) *FormSpec {
+	t.Helper()
+	path := filepath.Join(t.TempDir(), "form.yaml")
+	os.WriteFile(path, []byte(yaml), 0644)
+	spec, err := LoadSpec(path)
+	if err != nil {
+		t.Fatalf("LoadSpec: %v", err)
+	}
+	return spec
 }

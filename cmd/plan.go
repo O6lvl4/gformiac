@@ -23,7 +23,6 @@ func runPlan(cmd *cobra.Command, args []string) error {
 	if err != nil {
 		return err
 	}
-
 	if err := engine.Validate(spec); err != nil {
 		return err
 	}
@@ -33,13 +32,15 @@ func runPlan(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("状態ファイル読み込み失敗: %w", err)
 	}
 
-	// New form — no API access needed
 	if state == nil {
 		fmt.Println(engine.NewFormSummary(spec))
 		return nil
 	}
 
-	// Existing form — fetch remote and diff
+	return planExisting(spec, state)
+}
+
+func planExisting(spec *engine.FormSpec, state *engine.State) error {
 	ctx := context.Background()
 	client, err := engine.NewClient(ctx, credentialsFile, tokenFile)
 	if err != nil {

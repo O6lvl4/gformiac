@@ -24,10 +24,7 @@ func init() {
 
 func runImport(cmd *cobra.Command, args []string) error {
 	formID := args[0]
-	out := specFile
-	if outputFile != "" {
-		out = outputFile
-	}
+	out := importOutputPath()
 
 	ctx := context.Background()
 	client, err := engine.NewClient(ctx, credentialsFile, tokenFile)
@@ -40,10 +37,20 @@ func runImport(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
+	return saveImportResult(out, spec, state)
+}
+
+func importOutputPath() string {
+	if outputFile != "" {
+		return outputFile
+	}
+	return specFile
+}
+
+func saveImportResult(out string, spec *engine.FormSpec, state *engine.State) error {
 	if err := engine.SaveSpec(out, spec); err != nil {
 		return fmt.Errorf("定義ファイル保存失敗: %w", err)
 	}
-
 	if err := engine.SaveState(stateFile, state); err != nil {
 		return fmt.Errorf("状態ファイル保存失敗: %w", err)
 	}
