@@ -5,6 +5,7 @@ import (
 	"errors"
 	"io/fs"
 	"os"
+	"path/filepath"
 	"time"
 )
 
@@ -35,7 +36,11 @@ func LoadState(path string) (*State, error) {
 }
 
 // SaveState writes the state to disk as formatted JSON.
+// It creates parent directories if they do not exist.
 func SaveState(path string, state *State) error {
+	if err := os.MkdirAll(filepath.Dir(path), 0755); err != nil {
+		return err
+	}
 	data, err := json.MarshalIndent(state, "", "  ")
 	if err != nil {
 		return err

@@ -114,13 +114,16 @@ items:
 
 ## State Management
 
-`apply` 実行時に `gformiac.state.json` が生成され、フォームIDとアイテムIDのマッピングを保持する。このファイルにより次回以降の `plan` / `apply` でリモートとの差分検出が可能になる。
+管理ファイルはすべて `.gformiac/` ディレクトリに格納される（デフォルトの `.gitignore` で除外済み）。
 
 ```
-credentials.json        ← .gitignoreに追加推奨
-token.json              ← .gitignoreに追加推奨
-gformiac.state.json     ← .gitignoreに追加推奨
+.gformiac/
+├── credentials.json   # OAuth2 クライアント認証情報
+├── token.json         # キャッシュされた OAuth トークン
+└── state.json         # フォームID ↔ ローカル定義のマッピング
 ```
+
+`apply` 実行時に `.gformiac/state.json` が生成され、フォームIDとアイテムIDのマッピングを保持する。このファイルにより次回以降の `plan` / `apply` でリモートとの差分検出が可能になる。
 
 ## License
 

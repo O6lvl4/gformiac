@@ -114,13 +114,16 @@ items:
 
 ## State Management
 
-Running `apply` generates `gformiac.state.json`, which tracks the mapping between the local definition and the remote form/item IDs. This enables diff detection on subsequent `plan` / `apply` runs.
+All managed files are stored under `.gformiac/`, which should be gitignored (the default `.gitignore` already handles this).
 
 ```
-credentials.json        ← add to .gitignore
-token.json              ← add to .gitignore
-gformiac.state.json     ← add to .gitignore
+.gformiac/
+├── credentials.json   # OAuth2 client credentials
+├── token.json         # Cached OAuth token
+└── state.json         # Form ID ↔ local definition mapping
 ```
+
+Running `apply` generates `.gformiac/state.json`, which tracks the mapping between the local definition and the remote form/item IDs. This enables diff detection on subsequent `plan` / `apply` runs.
 
 ## License
 

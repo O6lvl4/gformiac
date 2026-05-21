@@ -1,0 +1,78 @@
+title: "miyazaki.go #N 参加者アンケート"
+description: "ご参加ありがとうございました！今後の改善の参考にさせてください。匿名回答です。（1〜2分）"
+
+items:
+  # ── 今回の勉強会 ──
+  - title: "今回の内容はいかがでしたか？"
+    type: scale
+    required: true
+    scale:
+      low: 1
+      high: 5
+      low_label: "いまいち"
+      high_label: "とてもよかった"
+
+  - title: "Go TDD の難易度はどうでしたか？"
+    type: choice
+    required: true
+    choice:
+      type: radio
+      options:
+        - "簡単だった・物足りなかった"
+        - "ちょうどよかった"
+        - "少し難しかったが、ついていけた"
+        - "難しくて追いつけない部分があった"
+
+  - title: "今回の進め方（ペース・説明・質疑など）で気になった点はありますか？"
+    type: paragraph
+
+  - title: "今回の感想や学びがあれば教えてください"
+    type: paragraph
+
+  # ── 開催について ──
+  - title: "開催について"
+    type: page_break
+    description: "時間帯や頻度について教えてください。"
+
+  - title: "参加しやすい開始時間は？"
+    type: choice
+    required: true
+    choice:
+      type: radio
+      options:
+        - "18:00（現状）"
+        - "18:30"
+        - "19:00"
+        - "どの時間でも参加できる"
+
+  - title: "開催頻度（現在: 月1回）はいかがですか？"
+    type: choice
+    choice:
+      type: radio
+      options:
+        - "もっと頻繁にやってほしい"
+        - "月1回でちょうどよい"
+        - "もう少し少なくてよい"
+
+  # ── 今後について ──
+  - title: "今後について"
+    type: page_break
+    description: "今後のコンテンツの参考にさせてください。"
+
+  - title: "やってみたいコンテンツは？（複数選択可）"
+    type: choice
+    choice:
+      type: checkbox
+      options:
+        - "TDD / 写経（現在のスタイル）"
+        - "輪読会"
+        - "LT会"
+        - "ハンズオン"
+        - "もくもく会"
+
+  - title: "取り上げてほしいテーマや題材があれば教えてください"
+    type: paragraph
+    description: "本、ライブラリ、Go の機能など何でも。"
+
+  - title: "その他、運営への要望やメッセージがあればお気軽にどうぞ"
+    type: paragraph

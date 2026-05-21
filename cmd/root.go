@@ -41,8 +41,8 @@ func init() {
 	}
 
 	rootCmd.PersistentFlags().StringVarP(&specFile, "file", "f", "form.yaml", locale.M.FlagFile)
-	rootCmd.PersistentFlags().StringVar(&credentialsFile, "credentials", "credentials.json", locale.M.FlagCredentials)
-	rootCmd.PersistentFlags().StringVar(&tokenFile, "token", "token.json", locale.M.FlagToken)
-	rootCmd.PersistentFlags().StringVar(&stateFile, "state", "gformiac.state.json", locale.M.FlagState)
+	rootCmd.PersistentFlags().StringVar(&credentialsFile, "credentials", ".gformiac/credentials.json", locale.M.FlagCredentials)
+	rootCmd.PersistentFlags().StringVar(&tokenFile, "token", ".gformiac/token.json", locale.M.FlagToken)
+	rootCmd.PersistentFlags().StringVar(&stateFile, "state", ".gformiac/state.json", locale.M.FlagState)
 	rootCmd.PersistentFlags().StringVar(&langFlag, "lang", "", locale.M.FlagLang)
 }
