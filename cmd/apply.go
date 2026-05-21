@@ -60,6 +60,8 @@ func applyNew(ctx context.Context, spec *engine.FormSpec) error {
 		return err
 	}
 
+	fmt.Println("フォーム作成中...")
+
 	state, err := client.CreateForm(ctx, spec)
 	if err != nil {
 		return err

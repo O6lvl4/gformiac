@@ -5,25 +5,7 @@ import (
 	"strings"
 )
 
-// Google Forms API の制約に基づくバリデーション
-// ref: https://developers.google.com/forms/api/reference/rest/v1/forms
-
-var validItemTypes = map[string]bool{
-	"short_answer": true,
-	"paragraph":    true,
-	"choice":       true,
-	"scale":        true,
-	"date":         true,
-	"time":         true,
-	"page_break":   true,
-}
-
-var validChoiceTypes = map[string]bool{
-	"radio":    true,
-	"checkbox": true,
-	"dropdown": true,
-}
-
+// ValidationError collects multiple validation failures.
 type ValidationError struct {
 	Errors []string
 }
@@ -32,6 +14,8 @@ func (e *ValidationError) Error() string {
 	return fmt.Sprintf("バリデーションエラー (%d件):\n  %s", len(e.Errors), strings.Join(e.Errors, "\n  "))
 }
 
+// Validate checks a FormSpec against Google Forms API constraints.
+// ref: https://developers.google.com/forms/api/reference/rest/v1/forms
 func Validate(spec *FormSpec) error {
 	var errs []string
 
@@ -46,7 +30,7 @@ func Validate(spec *FormSpec) error {
 	for i, item := range spec.Items {
 		prefix := fmt.Sprintf("items[%d]", i)
 
-		if item.Title == "" && item.Type != "page_break" {
+		if item.Title == "" && item.Type != ItemPageBreak {
 			errs = append(errs, fmt.Sprintf("%s: title は必須です", prefix))
 		}
 
@@ -55,16 +39,16 @@ func Validate(spec *FormSpec) error {
 			continue
 		}
 
-		if !validItemTypes[item.Type] {
+		if !item.Type.IsValid() {
 			errs = append(errs, fmt.Sprintf("%s: 不明な type %q (有効値: %s)",
-				prefix, item.Type, joinKeys(validItemTypes)))
+				prefix, item.Type, ValidItemTypes()))
 			continue
 		}
 
 		switch item.Type {
-		case "choice":
+		case ItemChoice:
 			errs = append(errs, validateChoice(prefix, item)...)
-		case "scale":
+		case ItemScale:
 			errs = append(errs, validateScale(prefix, item)...)
 		}
 	}
@@ -82,9 +66,9 @@ func validateChoice(prefix string, item ItemSpec) []string {
 		return []string{fmt.Sprintf("%s: type=choice には choice フィールドが必須です", prefix)}
 	}
 
-	if !validChoiceTypes[item.Choice.Type] {
+	if !item.Choice.Type.IsValid() {
 		errs = append(errs, fmt.Sprintf("%s: 不明な choice.type %q (有効値: %s)",
-			prefix, item.Choice.Type, joinKeys(validChoiceTypes)))
+			prefix, item.Choice.Type, ValidChoiceTypes()))
 	}
 
 	if len(item.Choice.Options) == 0 {
@@ -107,7 +91,6 @@ func validateScale(prefix string, item ItemSpec) []string {
 		return []string{fmt.Sprintf("%s: type=scale には scale フィールドが必須です", prefix)}
 	}
 
-	// Google Forms API: low は 0 または 1、high は 2〜10
 	if item.Scale.Low != 0 && item.Scale.Low != 1 {
 		errs = append(errs, fmt.Sprintf("%s: scale.low は 0 または 1 のみ (got %d)", prefix, item.Scale.Low))
 	}
@@ -122,12 +105,4 @@ func validateScale(prefix string, item ItemSpec) []string {
 	}
 
 	return errs
-}
-
-func joinKeys(m map[string]bool) string {
-	keys := make([]string, 0, len(m))
-	for k := range m {
-		keys = append(keys, k)
-	}
-	return strings.Join(keys, ", ")
 }

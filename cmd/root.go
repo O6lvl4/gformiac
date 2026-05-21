@@ -7,6 +7,9 @@ import (
 	"github.com/spf13/cobra"
 )
 
+// Version is set via ldflags at build time.
+var Version = "dev"
+
 var (
 	specFile        string
 	credentialsFile string
@@ -15,9 +18,10 @@ var (
 )
 
 var rootCmd = &cobra.Command{
-	Use:   "gformiac",
-	Short: "Google Forms Infrastructure as Code",
-	Long:  "YAML定義からGoogle Formsを宣言的に管理するIaCツール",
+	Use:     "gformiac",
+	Short:   "Google Forms Infrastructure as Code",
+	Long:    "YAML定義からGoogle Formsを宣言的に管理するIaCツール",
+	Version: Version,
 }
 
 func Execute() {

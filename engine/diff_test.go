@@ -8,15 +8,11 @@ import (
 func TestDiff_NoChanges(t *testing.T) {
 	spec := &FormSpec{
 		Title: "Same",
-		Items: []ItemSpec{
-			{Title: "Q1", Type: "short_answer"},
-		},
+		Items: []ItemSpec{{Title: "Q1", Type: ItemShortAnswer}},
 	}
 	remote := &FormSpec{
 		Title: "Same",
-		Items: []ItemSpec{
-			{Title: "Q1", Type: "short_answer"},
-		},
+		Items: []ItemSpec{{Title: "Q1", Type: ItemShortAnswer}},
 	}
 
 	diff := Diff(spec, remote, nil)
@@ -45,15 +41,13 @@ func TestDiff_ItemCreated(t *testing.T) {
 	local := &FormSpec{
 		Title: "T",
 		Items: []ItemSpec{
-			{Title: "Q1", Type: "short_answer"},
-			{Title: "Q2", Type: "paragraph"},
+			{Title: "Q1", Type: ItemShortAnswer},
+			{Title: "Q2", Type: ItemParagraph},
 		},
 	}
 	remote := &FormSpec{
 		Title: "T",
-		Items: []ItemSpec{
-			{Title: "Q1", Type: "short_answer"},
-		},
+		Items: []ItemSpec{{Title: "Q1", Type: ItemShortAnswer}},
 	}
 
 	diff := Diff(local, remote, nil)
@@ -69,15 +63,10 @@ func TestDiff_ItemCreated(t *testing.T) {
 }
 
 func TestDiff_ItemDeleted(t *testing.T) {
-	local := &FormSpec{
-		Title: "T",
-		Items: []ItemSpec{},
-	}
+	local := &FormSpec{Title: "T"}
 	remote := &FormSpec{
 		Title: "T",
-		Items: []ItemSpec{
-			{Title: "Q1", Type: "short_answer"},
-		},
+		Items: []ItemSpec{{Title: "Q1", Type: ItemShortAnswer}},
 	}
 
 	diff := Diff(local, remote, nil)
@@ -92,15 +81,11 @@ func TestDiff_ItemDeleted(t *testing.T) {
 func TestDiff_ItemUpdated(t *testing.T) {
 	local := &FormSpec{
 		Title: "T",
-		Items: []ItemSpec{
-			{Title: "Q1 Updated", Type: "paragraph", Required: true},
-		},
+		Items: []ItemSpec{{Title: "Q1 Updated", Type: ItemParagraph, Required: true}},
 	}
 	remote := &FormSpec{
 		Title: "T",
-		Items: []ItemSpec{
-			{Title: "Q1", Type: "short_answer", Required: false},
-		},
+		Items: []ItemSpec{{Title: "Q1", Type: ItemShortAnswer}},
 	}
 
 	diff := Diff(local, remote, nil)
@@ -120,13 +105,13 @@ func TestDiff_ChoiceOptionsChanged(t *testing.T) {
 	local := &FormSpec{
 		Title: "T",
 		Items: []ItemSpec{
-			{Title: "Q", Type: "choice", Choice: &ChoiceSpec{Type: "radio", Options: []string{"A", "B", "C"}}},
+			{Title: "Q", Type: ItemChoice, Choice: &ChoiceSpec{Type: ChoiceRadio, Options: []string{"A", "B", "C"}}},
 		},
 	}
 	remote := &FormSpec{
 		Title: "T",
 		Items: []ItemSpec{
-			{Title: "Q", Type: "choice", Choice: &ChoiceSpec{Type: "radio", Options: []string{"A", "B"}}},
+			{Title: "Q", Type: ItemChoice, Choice: &ChoiceSpec{Type: ChoiceRadio, Options: []string{"A", "B"}}},
 		},
 	}
 
@@ -140,13 +125,13 @@ func TestDiff_ScaleChanged(t *testing.T) {
 	local := &FormSpec{
 		Title: "T",
 		Items: []ItemSpec{
-			{Title: "Q", Type: "scale", Scale: &ScaleSpec{Low: 1, High: 10}},
+			{Title: "Q", Type: ItemScale, Scale: &ScaleSpec{Low: 1, High: 10}},
 		},
 	}
 	remote := &FormSpec{
 		Title: "T",
 		Items: []ItemSpec{
-			{Title: "Q", Type: "scale", Scale: &ScaleSpec{Low: 1, High: 5}},
+			{Title: "Q", Type: ItemScale, Scale: &ScaleSpec{Low: 1, High: 5}},
 		},
 	}
 
@@ -160,15 +145,13 @@ func TestDiff_String_Summary(t *testing.T) {
 	local := &FormSpec{
 		Title: "T",
 		Items: []ItemSpec{
-			{Title: "New", Type: "short_answer"},
-			{Title: "Changed", Type: "paragraph"},
+			{Title: "New", Type: ItemShortAnswer},
+			{Title: "Changed", Type: ItemParagraph},
 		},
 	}
 	remote := &FormSpec{
 		Title: "T",
-		Items: []ItemSpec{
-			{Title: "Old", Type: "short_answer"},
-		},
+		Items: []ItemSpec{{Title: "Old", Type: ItemShortAnswer}},
 	}
 
 	diff := Diff(local, remote, nil)
@@ -184,19 +167,36 @@ func TestNewFormSummary(t *testing.T) {
 		Title:       "My Form",
 		Description: "Desc",
 		Items: []ItemSpec{
-			{Title: "Q1", Type: "short_answer", Required: true},
-			{Title: "Q2", Type: "choice", Choice: &ChoiceSpec{Type: "checkbox", Options: []string{"A", "B"}}},
+			{Title: "Q1", Type: ItemShortAnswer, Required: true},
+			{Title: "Q2", Type: ItemChoice, Choice: &ChoiceSpec{Type: ChoiceCheckbox, Options: []string{"A", "B"}}},
 		},
 	}
 
 	s := NewFormSummary(spec)
 	if !strings.Contains(s, "My Form") {
-		t.Errorf("missing title in summary: %s", s)
+		t.Errorf("missing title: %s", s)
 	}
 	if !strings.Contains(s, "2項目を作成") {
-		t.Errorf("missing item count in summary: %s", s)
+		t.Errorf("missing count: %s", s)
 	}
 	if !strings.Contains(s, "checkbox") {
-		t.Errorf("missing choice detail in summary: %s", s)
+		t.Errorf("missing choice detail: %s", s)
+	}
+}
+
+func TestChangeType_String(t *testing.T) {
+	cases := []struct {
+		t    ChangeType
+		want string
+	}{
+		{ChangeCreate, "create"},
+		{ChangeUpdate, "update"},
+		{ChangeDelete, "delete"},
+		{ChangeType(99), "unknown"},
+	}
+	for _, c := range cases {
+		if got := c.t.String(); got != c.want {
+			t.Errorf("ChangeType(%d).String() = %q, want %q", c.t, got, c.want)
+		}
 	}
 }

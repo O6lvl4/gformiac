@@ -47,23 +47,20 @@ items:
 		t.Fatalf("items count = %d, want 3", len(spec.Items))
 	}
 
-	// short_answer
-	if spec.Items[0].Type != "short_answer" || !spec.Items[0].Required {
+	if spec.Items[0].Type != ItemShortAnswer || !spec.Items[0].Required {
 		t.Errorf("item[0] = %+v", spec.Items[0])
 	}
 
-	// choice
 	item1 := spec.Items[1]
-	if item1.Type != "choice" || item1.Choice == nil {
+	if item1.Type != ItemChoice || item1.Choice == nil {
 		t.Fatalf("item[1] type/choice unexpected: %+v", item1)
 	}
-	if item1.Choice.Type != "radio" || len(item1.Choice.Options) != 2 {
+	if item1.Choice.Type != ChoiceRadio || len(item1.Choice.Options) != 2 {
 		t.Errorf("item[1].choice = %+v", item1.Choice)
 	}
 
-	// scale
 	item2 := spec.Items[2]
-	if item2.Type != "scale" || item2.Scale == nil {
+	if item2.Type != ItemScale || item2.Scale == nil {
 		t.Fatalf("item[2] type/scale unexpected: %+v", item2)
 	}
 	if item2.Scale.Low != 1 || item2.Scale.High != 5 {
@@ -94,9 +91,9 @@ func TestSaveAndLoadRoundTrip(t *testing.T) {
 		Title:       "Round Trip",
 		Description: "Test",
 		Items: []ItemSpec{
-			{Title: "Q1", Type: "short_answer", Required: true},
-			{Title: "Q2", Type: "choice", Choice: &ChoiceSpec{
-				Type:    "checkbox",
+			{Title: "Q1", Type: ItemShortAnswer, Required: true},
+			{Title: "Q2", Type: ItemChoice, Choice: &ChoiceSpec{
+				Type:    ChoiceCheckbox,
 				Options: []string{"A", "B", "C"},
 			}},
 		},
@@ -115,7 +112,31 @@ func TestSaveAndLoadRoundTrip(t *testing.T) {
 	if loaded.Title != spec.Title || len(loaded.Items) != 2 {
 		t.Errorf("round trip mismatch: got %+v", loaded)
 	}
-	if loaded.Items[1].Choice.Type != "checkbox" || len(loaded.Items[1].Choice.Options) != 3 {
+	if loaded.Items[1].Choice.Type != ChoiceCheckbox || len(loaded.Items[1].Choice.Options) != 3 {
 		t.Errorf("choice round trip mismatch: got %+v", loaded.Items[1].Choice)
+	}
+}
+
+func TestItemType_IsValid(t *testing.T) {
+	valid := []ItemType{ItemShortAnswer, ItemParagraph, ItemChoice, ItemScale, ItemDate, ItemTime, ItemPageBreak}
+	for _, v := range valid {
+		if !v.IsValid() {
+			t.Errorf("%q should be valid", v)
+		}
+	}
+	if ItemType("bogus").IsValid() {
+		t.Error("bogus should be invalid")
+	}
+}
+
+func TestChoiceType_IsValid(t *testing.T) {
+	valid := []ChoiceType{ChoiceRadio, ChoiceCheckbox, ChoiceDropdown}
+	for _, v := range valid {
+		if !v.IsValid() {
+			t.Errorf("%q should be valid", v)
+		}
+	}
+	if ChoiceType("multi").IsValid() {
+		t.Error("multi should be invalid")
 	}
 }

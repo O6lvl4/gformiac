@@ -2,18 +2,34 @@ package engine
 
 import (
 	"fmt"
+	"slices"
 	"strings"
 )
 
+// ChangeType classifies a diff entry.
 type ChangeType int
 
 const (
-	ChangeNone ChangeType = iota
-	ChangeCreate
+	ChangeCreate ChangeType = iota
 	ChangeUpdate
 	ChangeDelete
 )
 
+// String returns a label for the change type.
+func (t ChangeType) String() string {
+	switch t {
+	case ChangeCreate:
+		return "create"
+	case ChangeUpdate:
+		return "update"
+	case ChangeDelete:
+		return "delete"
+	default:
+		return "unknown"
+	}
+}
+
+// Change represents a single item-level difference.
 type Change struct {
 	Type  ChangeType
 	Index int
@@ -21,16 +37,17 @@ type Change struct {
 	New   *ItemSpec
 }
 
+// DiffResult holds the full set of differences between local and remote forms.
 type DiffResult struct {
 	InfoChanged bool
 	InfoDetails []string
 	Changes     []Change
 }
 
-func Diff(local *FormSpec, remote *FormSpec, state *State) *DiffResult {
+// Diff computes the differences between a local spec and a remote spec.
+func Diff(local, remote *FormSpec, _ *State) *DiffResult {
 	result := &DiffResult{}
 
-	// Form info diff
 	if local.Title != remote.Title {
 		result.InfoChanged = true
 		result.InfoDetails = append(result.InfoDetails,
@@ -42,13 +59,7 @@ func Diff(local *FormSpec, remote *FormSpec, state *State) *DiffResult {
 			fmt.Sprintf("  ~ description: %q -> %q", remote.Description, local.Description))
 	}
 
-	// Item diff
-	maxLen := len(local.Items)
-	if len(remote.Items) > maxLen {
-		maxLen = len(remote.Items)
-	}
-
-	for i := 0; i < maxLen; i++ {
+	for i := range max(len(local.Items), len(remote.Items)) {
 		switch {
 		case i >= len(local.Items):
 			old := remote.Items[i]
@@ -56,16 +67,16 @@ func Diff(local *FormSpec, remote *FormSpec, state *State) *DiffResult {
 				Type: ChangeDelete, Index: i, Old: &old,
 			})
 		case i >= len(remote.Items):
-			new := local.Items[i]
+			item := local.Items[i]
 			result.Changes = append(result.Changes, Change{
-				Type: ChangeCreate, Index: i, New: &new,
+				Type: ChangeCreate, Index: i, New: &item,
 			})
 		default:
 			old := remote.Items[i]
-			new := local.Items[i]
-			if !itemsEqual(old, new) {
+			item := local.Items[i]
+			if !itemsEqual(old, item) {
 				result.Changes = append(result.Changes, Change{
-					Type: ChangeUpdate, Index: i, Old: &old, New: &new,
+					Type: ChangeUpdate, Index: i, Old: &old, New: &item,
 				})
 			}
 		}
@@ -74,10 +85,12 @@ func Diff(local *FormSpec, remote *FormSpec, state *State) *DiffResult {
 	return result
 }
 
+// HasChanges reports whether there are any differences.
 func (d *DiffResult) HasChanges() bool {
 	return d.InfoChanged || len(d.Changes) > 0
 }
 
+// String formats the diff as a human-readable summary.
 func (d *DiffResult) String() string {
 	if !d.HasChanges() {
 		return "変更なし"
@@ -90,7 +103,7 @@ func (d *DiffResult) String() string {
 		lines = append(lines, d.InfoDetails...)
 	}
 
-	creates, updates, deletes := 0, 0, 0
+	var creates, updates, deletes int
 	for _, c := range d.Changes {
 		switch c.Type {
 		case ChangeCreate:
@@ -111,7 +124,7 @@ func (d *DiffResult) String() string {
 	return strings.Join(lines, "\n")
 }
 
-// NewFormSummary returns a human-readable summary for creating a new form.
+// NewFormSummary returns a human-readable plan for creating a new form.
 func NewFormSummary(spec *FormSpec) string {
 	var lines []string
 	lines = append(lines, "新規フォーム作成:")
@@ -121,7 +134,7 @@ func NewFormSummary(spec *FormSpec) string {
 	}
 	lines = append(lines, "")
 	for i, item := range spec.Items {
-		detail := item.Type
+		detail := string(item.Type)
 		if item.Choice != nil {
 			detail = fmt.Sprintf("%s/%s [%d options]", item.Type, item.Choice.Type, len(item.Choice.Options))
 		}
@@ -162,16 +175,8 @@ func itemsEqual(a, b ItemSpec) bool {
 		return false
 	}
 	if a.Choice != nil {
-		if a.Choice.Type != b.Choice.Type {
+		if a.Choice.Type != b.Choice.Type || !slices.Equal(a.Choice.Options, b.Choice.Options) {
 			return false
-		}
-		if len(a.Choice.Options) != len(b.Choice.Options) {
-			return false
-		}
-		for i := range a.Choice.Options {
-			if a.Choice.Options[i] != b.Choice.Options[i] {
-				return false
-			}
 		}
 	}
 	if (a.Scale == nil) != (b.Scale == nil) {

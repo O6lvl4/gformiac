@@ -6,17 +6,39 @@ import (
 	forms "google.golang.org/api/forms/v1"
 )
 
+// choiceTypeToAPI converts a ChoiceType to the Google Forms API string.
+func choiceTypeToAPI(t ChoiceType) string {
+	switch t {
+	case ChoiceCheckbox:
+		return "CHECKBOX"
+	case ChoiceDropdown:
+		return "DROP_DOWN"
+	default:
+		return "RADIO"
+	}
+}
+
+// choiceTypeFromAPI converts a Google Forms API choice type string to ChoiceType.
+func choiceTypeFromAPI(s string) ChoiceType {
+	switch s {
+	case "CHECKBOX":
+		return ChoiceCheckbox
+	case "DROP_DOWN":
+		return ChoiceDropdown
+	default:
+		return ChoiceRadio
+	}
+}
+
 // specToCreateRequests builds batchUpdate requests for a newly created form.
-// The form title is already set via Create(); this sets description + items.
+// Title is already set via Create(); this sets description and items.
 func specToCreateRequests(spec *FormSpec) []*forms.Request {
 	var requests []*forms.Request
 
 	if spec.Description != "" {
 		requests = append(requests, &forms.Request{
 			UpdateFormInfo: &forms.UpdateFormInfoRequest{
-				Info: &forms.Info{
-					Description: spec.Description,
-				},
+				Info:       &forms.Info{Description: spec.Description},
 				UpdateMask: "description",
 			},
 		})
@@ -32,11 +54,10 @@ func specToCreateRequests(spec *FormSpec) []*forms.Request {
 }
 
 // specToUpdateRequests builds batchUpdate requests to reconcile a remote form.
-// Strategy: update info, delete all items (reverse order), recreate all items.
+// Strategy: update info, delete all items (reverse order), recreate all.
 func specToUpdateRequests(spec *FormSpec, remote *forms.Form) []*forms.Request {
 	var requests []*forms.Request
 
-	// Update form info
 	requests = append(requests, &forms.Request{
 		UpdateFormInfo: &forms.UpdateFormInfoRequest{
 			Info: &forms.Info{
@@ -47,7 +68,6 @@ func specToUpdateRequests(spec *FormSpec, remote *forms.Form) []*forms.Request {
 		},
 	})
 
-	// Delete existing items in reverse order
 	for i := len(remote.Items) - 1; i >= 0; i-- {
 		requests = append(requests, &forms.Request{
 			DeleteItem: &forms.DeleteItemRequest{
@@ -59,7 +79,6 @@ func specToUpdateRequests(spec *FormSpec, remote *forms.Form) []*forms.Request {
 		})
 	}
 
-	// Recreate all items from spec
 	for i, item := range spec.Items {
 		if req := itemSpecToRequest(item, i); req != nil {
 			requests = append(requests, req)
@@ -76,7 +95,7 @@ func itemSpecToRequest(item ItemSpec, index int) *forms.Request {
 	}
 
 	switch item.Type {
-	case "short_answer":
+	case ItemShortAnswer:
 		apiItem.QuestionItem = &forms.QuestionItem{
 			Question: &forms.Question{
 				Required:     item.Required,
@@ -84,7 +103,7 @@ func itemSpecToRequest(item ItemSpec, index int) *forms.Request {
 			},
 		}
 
-	case "paragraph":
+	case ItemParagraph:
 		apiItem.QuestionItem = &forms.QuestionItem{
 			Question: &forms.Question{
 				Required:     item.Required,
@@ -92,32 +111,25 @@ func itemSpecToRequest(item ItemSpec, index int) *forms.Request {
 			},
 		}
 
-	case "choice":
+	case ItemChoice:
 		if item.Choice == nil {
 			return nil
 		}
-		choiceType := "RADIO"
-		switch item.Choice.Type {
-		case "checkbox":
-			choiceType = "CHECKBOX"
-		case "dropdown":
-			choiceType = "DROP_DOWN"
-		}
-		var options []*forms.Option
-		for _, v := range item.Choice.Options {
-			options = append(options, &forms.Option{Value: v})
+		options := make([]*forms.Option, len(item.Choice.Options))
+		for i, v := range item.Choice.Options {
+			options[i] = &forms.Option{Value: v}
 		}
 		apiItem.QuestionItem = &forms.QuestionItem{
 			Question: &forms.Question{
 				Required: item.Required,
 				ChoiceQuestion: &forms.ChoiceQuestion{
-					Type:    choiceType,
+					Type:    choiceTypeToAPI(item.Choice.Type),
 					Options: options,
 				},
 			},
 		}
 
-	case "scale":
+	case ItemScale:
 		if item.Scale == nil {
 			return nil
 		}
@@ -125,15 +137,15 @@ func itemSpecToRequest(item ItemSpec, index int) *forms.Request {
 			Question: &forms.Question{
 				Required: item.Required,
 				ScaleQuestion: &forms.ScaleQuestion{
-					Low:      item.Scale.Low,
-					High:     item.Scale.High,
-					LowLabel: item.Scale.LowLabel,
+					Low:       item.Scale.Low,
+					High:      item.Scale.High,
+					LowLabel:  item.Scale.LowLabel,
 					HighLabel: item.Scale.HighLabel,
 				},
 			},
 		}
 
-	case "date":
+	case ItemDate:
 		apiItem.QuestionItem = &forms.QuestionItem{
 			Question: &forms.Question{
 				Required:     item.Required,
@@ -141,7 +153,7 @@ func itemSpecToRequest(item ItemSpec, index int) *forms.Request {
 			},
 		}
 
-	case "time":
+	case ItemTime:
 		apiItem.QuestionItem = &forms.QuestionItem{
 			Question: &forms.Question{
 				Required:     item.Required,
@@ -149,7 +161,7 @@ func itemSpecToRequest(item ItemSpec, index int) *forms.Request {
 			},
 		}
 
-	case "page_break":
+	case ItemPageBreak:
 		apiItem.PageBreakItem = &forms.PageBreakItem{}
 
 	default:
@@ -189,12 +201,11 @@ func apiItemToSpec(item *forms.Item) ItemSpec {
 	}
 
 	if item.PageBreakItem != nil {
-		spec.Type = "page_break"
+		spec.Type = ItemPageBreak
 		return spec
 	}
 
 	if item.QuestionItem == nil || item.QuestionItem.Question == nil {
-		spec.Type = "unknown"
 		return spec
 	}
 
@@ -204,28 +215,24 @@ func apiItemToSpec(item *forms.Item) ItemSpec {
 	switch {
 	case q.TextQuestion != nil:
 		if q.TextQuestion.Paragraph {
-			spec.Type = "paragraph"
+			spec.Type = ItemParagraph
 		} else {
-			spec.Type = "short_answer"
+			spec.Type = ItemShortAnswer
 		}
 
 	case q.ChoiceQuestion != nil:
-		spec.Type = "choice"
-		choiceType := "radio"
-		switch q.ChoiceQuestion.Type {
-		case "CHECKBOX":
-			choiceType = "checkbox"
-		case "DROP_DOWN":
-			choiceType = "dropdown"
+		spec.Type = ItemChoice
+		options := make([]string, len(q.ChoiceQuestion.Options))
+		for i, opt := range q.ChoiceQuestion.Options {
+			options[i] = opt.Value
 		}
-		var options []string
-		for _, opt := range q.ChoiceQuestion.Options {
-			options = append(options, opt.Value)
+		spec.Choice = &ChoiceSpec{
+			Type:    choiceTypeFromAPI(q.ChoiceQuestion.Type),
+			Options: options,
 		}
-		spec.Choice = &ChoiceSpec{Type: choiceType, Options: options}
 
 	case q.ScaleQuestion != nil:
-		spec.Type = "scale"
+		spec.Type = ItemScale
 		spec.Scale = &ScaleSpec{
 			Low:       q.ScaleQuestion.Low,
 			High:      q.ScaleQuestion.High,
@@ -234,13 +241,10 @@ func apiItemToSpec(item *forms.Item) ItemSpec {
 		}
 
 	case q.DateQuestion != nil:
-		spec.Type = "date"
+		spec.Type = ItemDate
 
 	case q.TimeQuestion != nil:
-		spec.Type = "time"
-
-	default:
-		spec.Type = "unknown"
+		spec.Type = ItemTime
 	}
 
 	return spec
@@ -249,18 +253,18 @@ func apiItemToSpec(item *forms.Item) ItemSpec {
 // buildState creates a State from a remote form response.
 func buildState(form *forms.Form) *State {
 	state := &State{
-		FormID:      form.FormId,
+		FormID:       form.FormId,
 		ResponderURL: form.ResponderUri,
-		LastApplied: time.Now(),
+		ItemIDs:      make([]string, len(form.Items)),
+		QuestionIDs:  make([]string, len(form.Items)),
+		LastApplied:  time.Now(),
 	}
 
-	for _, item := range form.Items {
-		state.ItemIDs = append(state.ItemIDs, item.ItemId)
-		qid := ""
+	for i, item := range form.Items {
+		state.ItemIDs[i] = item.ItemId
 		if item.QuestionItem != nil && item.QuestionItem.Question != nil {
-			qid = item.QuestionItem.Question.QuestionId
+			state.QuestionIDs[i] = item.QuestionItem.Question.QuestionId
 		}
-		state.QuestionIDs = append(state.QuestionIDs, qid)
 	}
 
 	return state

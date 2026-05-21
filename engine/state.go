@@ -2,10 +2,13 @@ package engine
 
 import (
 	"encoding/json"
+	"errors"
+	"io/fs"
 	"os"
 	"time"
 )
 
+// State tracks the mapping between a local form definition and its remote Google Form.
 type State struct {
 	FormID       string    `json:"form_id"`
 	ResponderURL string    `json:"responder_url,omitempty"`
@@ -14,10 +17,12 @@ type State struct {
 	LastApplied  time.Time `json:"last_applied"`
 }
 
+// LoadState reads the state file. Returns (nil, nil) if the file does not exist,
+// signaling that no form has been created yet.
 func LoadState(path string) (*State, error) {
 	data, err := os.ReadFile(path)
 	if err != nil {
-		if os.IsNotExist(err) {
+		if errors.Is(err, fs.ErrNotExist) {
 			return nil, nil
 		}
 		return nil, err
@@ -29,6 +34,7 @@ func LoadState(path string) (*State, error) {
 	return &state, nil
 }
 
+// SaveState writes the state to disk as formatted JSON.
 func SaveState(path string, state *State) error {
 	data, err := json.MarshalIndent(state, "", "  ")
 	if err != nil {
