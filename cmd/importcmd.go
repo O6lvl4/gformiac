@@ -9,6 +9,7 @@ import (
 	"github.com/spf13/cobra"
 )
 
+// outputFile is the path for the imported YAML spec; defaults to --file when empty.
 var outputFile string
 
 var importCmd = &cobra.Command{

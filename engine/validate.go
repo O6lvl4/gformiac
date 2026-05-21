@@ -7,16 +7,19 @@ import (
 	"github.com/O6lvl4/gformiac/locale"
 )
 
-// ValidationError collects multiple validation failures.
+// ValidationError collects multiple validation failures into a single error.
 type ValidationError struct {
 	Errors []string
 }
 
+// Error implements the error interface and returns a summary of all collected
+// validation failures.
 func (e *ValidationError) Error() string {
 	return fmt.Sprintf(locale.M.ValErrors, len(e.Errors), strings.Join(e.Errors, "\n  "))
 }
 
 // Validate checks a FormSpec against Google Forms API constraints.
+// It returns a *ValidationError containing all failures, or nil if the spec is valid.
 func Validate(spec *FormSpec) error {
 	var errs []string
 

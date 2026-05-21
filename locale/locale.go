@@ -1,3 +1,6 @@
+// Package locale provides internationalization support for gformiac.
+// It auto-detects the display language from environment variables and allows
+// runtime switching between supported languages via Set.
 package locale
 
 import (
@@ -9,8 +12,11 @@ import (
 // Lang represents a supported language.
 type Lang string
 
+// Supported language codes.
 const (
+	// EN selects English messages.
 	EN Lang = "en"
+	// JA selects Japanese messages.
 	JA Lang = "ja"
 )
 
@@ -28,7 +34,7 @@ func init() {
 	}
 }
 
-// Set switches the active language.
+// Set switches the active language. It is safe to call concurrently.
 func Set(l Lang) {
 	mu.Lock()
 	defer mu.Unlock()
@@ -41,7 +47,7 @@ func Set(l Lang) {
 	}
 }
 
-// Get returns the current language.
+// Get returns the current language. It is safe to call concurrently.
 func Get() Lang {
 	mu.RLock()
 	defer mu.RUnlock()
@@ -64,14 +70,16 @@ func detect() Lang {
 }
 
 // Messages holds all user-facing strings for a given language.
+// Each field corresponds to a distinct UI message; format strings follow
+// the fmt package conventions (%s, %d, %q, %w).
 type Messages struct {
-	// CLI
+	// CLI descriptions used in cobra command help output.
 	CmdLong     string
 	PlanShort   string
 	ApplyShort  string
 	ImportShort string
 
-	// Flags
+	// Flag descriptions shown in --help output.
 	FlagFile        string
 	FlagCredentials string
 	FlagToken       string
@@ -80,17 +88,17 @@ type Messages struct {
 	FlagOutput      string
 	FlagLang        string
 
-	// Plan / Diff
+	// Plan / Diff output messages.
 	NoChanges     string
 	NoChangesLong string
 	FormInfo      string
 	DiffSummary   string // "+%d ~%d -%d"
 
-	// New form
+	// New form creation summary messages.
 	NewFormHeader string
 	CreateSummary string // "%d items to create"
 
-	// Apply
+	// Apply command progress and result messages.
 	Creating     string
 	Applied      string
 	Cancelled    string
@@ -99,12 +107,12 @@ type Messages struct {
 	URLLabel     string
 	StateLabel   string
 
-	// Import
+	// Import command result messages.
 	Imported      string
 	SpecFileLabel string
 	ItemCount     string
 
-	// Auth
+	// OAuth2 browser authentication messages.
 	AuthBrowser     string
 	AuthSuccessHTML string
 	AuthFailedHTML  string
@@ -112,7 +120,7 @@ type Messages struct {
 	AuthTimeout     string
 	AuthOpenURL     string
 
-	// Validation (format strings with prefix %s)
+	// Validation error messages (format strings with item prefix %s).
 	ValErrors      string
 	ValTitle       string
 	ValItems       string
@@ -128,7 +136,7 @@ type Messages struct {
 	ValScaleHigh   string
 	ValScaleRange  string
 
-	// Errors (format strings for fmt.Errorf)
+	// Error message fragments wrapped via fmt.Errorf.
 	ErrReadFile    string
 	ErrParseYAML   string
 	ErrTitleReq    string

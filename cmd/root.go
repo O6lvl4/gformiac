@@ -1,3 +1,6 @@
+// Package cmd implements the gformiac CLI commands using cobra.
+// It wires together the engine and locale packages to provide plan, apply,
+// and import subcommands with persistent flags for credentials and state.
 package cmd
 
 import (
@@ -8,9 +11,10 @@ import (
 	"github.com/spf13/cobra"
 )
 
-// Version is set via ldflags at build time.
+// Version is the CLI version string, set via ldflags at build time.
 var Version = "dev"
 
+// Persistent flag values shared across all subcommands.
 var (
 	specFile        string
 	credentialsFile string
@@ -25,6 +29,7 @@ var rootCmd = &cobra.Command{
 	Version: Version,
 }
 
+// Execute runs the root cobra command and exits the process on error.
 func Execute() {
 	if err := rootCmd.Execute(); err != nil {
 		fmt.Fprintln(os.Stderr, err)

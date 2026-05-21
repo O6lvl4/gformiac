@@ -19,6 +19,7 @@ import (
 	"google.golang.org/api/option"
 )
 
+// formsScope is the OAuth2 scope required for read/write access to Google Forms.
 const formsScope = "https://www.googleapis.com/auth/forms.body"
 
 // Client wraps the Google Forms API service.
@@ -27,6 +28,8 @@ type Client struct {
 }
 
 // NewClient creates an authenticated Forms API client.
+// It first attempts Application Default Credentials (ADC) and falls back to
+// interactive OAuth2 using the provided credentials and token files.
 func NewClient(ctx context.Context, credentialsFile, tokenFile string) (*Client, error) {
 	if client, err := tryDefaultCredentials(ctx); err == nil {
 		return client, nil

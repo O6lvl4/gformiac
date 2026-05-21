@@ -12,6 +12,7 @@ import (
 	"github.com/spf13/cobra"
 )
 
+// autoApprove skips the interactive confirmation prompt when true.
 var autoApprove bool
 
 var applyCmd = &cobra.Command{

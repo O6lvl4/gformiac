@@ -11,9 +11,13 @@ import (
 // ChangeType classifies a diff entry.
 type ChangeType int
 
+// Change type constants used to categorize item-level differences.
 const (
+	// ChangeCreate indicates an item exists locally but not remotely.
 	ChangeCreate ChangeType = iota
+	// ChangeUpdate indicates an item exists in both places but differs.
 	ChangeUpdate
+	// ChangeDelete indicates an item exists remotely but not locally.
 	ChangeDelete
 )
 
@@ -47,6 +51,7 @@ type DiffResult struct {
 }
 
 // Diff computes the differences between a local spec and a remote spec.
+// The State parameter is reserved for future use (e.g., ID-based matching).
 func Diff(local, remote *FormSpec, _ *State) *DiffResult {
 	result := &DiffResult{}
 	diffInfo(result, local, remote)

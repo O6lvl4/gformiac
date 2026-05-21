@@ -1,3 +1,5 @@
+// Package engine implements the core logic for gformiac: schema types, state
+// management, Google Forms API interactions, diff computation, and validation.
 package engine
 
 import (
@@ -11,14 +13,22 @@ import (
 // ItemType represents the type of a form item.
 type ItemType string
 
+// Recognized item types that map directly to Google Forms question types.
 const (
+	// ItemShortAnswer is a single-line text question.
 	ItemShortAnswer ItemType = "short_answer"
-	ItemParagraph   ItemType = "paragraph"
-	ItemChoice      ItemType = "choice"
-	ItemScale       ItemType = "scale"
-	ItemDate        ItemType = "date"
-	ItemTime        ItemType = "time"
-	ItemPageBreak   ItemType = "page_break"
+	// ItemParagraph is a multi-line text question.
+	ItemParagraph ItemType = "paragraph"
+	// ItemChoice is a question with selectable options (radio, checkbox, or dropdown).
+	ItemChoice ItemType = "choice"
+	// ItemScale is a linear-scale question with a numeric range.
+	ItemScale ItemType = "scale"
+	// ItemDate is a date-picker question.
+	ItemDate ItemType = "date"
+	// ItemTime is a time-picker question.
+	ItemTime ItemType = "time"
+	// ItemPageBreak inserts a visual page break between sections.
+	ItemPageBreak ItemType = "page_break"
 )
 
 // IsValid reports whether t is a recognized item type.
@@ -39,9 +49,13 @@ func ValidItemTypes() string {
 // ChoiceType represents the sub-type of a choice question.
 type ChoiceType string
 
+// Recognized choice sub-types for ItemChoice questions.
 const (
-	ChoiceRadio    ChoiceType = "radio"
+	// ChoiceRadio renders options as radio buttons (single-select).
+	ChoiceRadio ChoiceType = "radio"
+	// ChoiceCheckbox renders options as checkboxes (multi-select).
 	ChoiceCheckbox ChoiceType = "checkbox"
+	// ChoiceDropdown renders options as a dropdown list (single-select).
 	ChoiceDropdown ChoiceType = "dropdown"
 )
 
