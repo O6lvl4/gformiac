@@ -1,6 +1,6 @@
 # gformiac
 
-[English](README.md)
+[English](README.md) | [API Docs](https://o6lvl4.github.io/gformiac/)
 
 Google Forms Infrastructure as Code — YAML定義からGoogle Formsを宣言的に管理するCLIツール。
 

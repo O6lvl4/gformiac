@@ -1,6 +1,6 @@
 # gformiac
 
-[日本語](README.ja.md)
+[日本語](README.ja.md) | [API Docs](https://o6lvl4.github.io/gformiac/)
 
 Google Forms Infrastructure as Code — Declaratively manage Google Forms from YAML definitions.
 
