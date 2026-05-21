@@ -24,6 +24,10 @@ func runPlan(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
+	if err := engine.Validate(spec); err != nil {
+		return err
+	}
+
 	state, err := engine.LoadState(stateFile)
 	if err != nil {
 		return fmt.Errorf("状態ファイル読み込み失敗: %w", err)
