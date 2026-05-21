@@ -1,0 +1,49 @@
+title: "顧客満足度アンケート"
+description: "サービス改善のため、ご意見をお聞かせください。"
+
+items:
+  - title: "お名前"
+    type: short_answer
+    required: true
+
+  - title: "満足度を教えてください"
+    type: choice
+    required: true
+    choice:
+      type: radio
+      options:
+        - "とても満足"
+        - "満足"
+        - "普通"
+        - "不満"
+        - "とても不満"
+
+  - title: "利用している機能（複数選択可）"
+    type: choice
+    choice:
+      type: checkbox
+      options:
+        - "ダッシュボード"
+        - "レポート機能"
+        - "API連携"
+        - "通知設定"
+
+  - title: "おすすめ度"
+    type: scale
+    required: true
+    scale:
+      low: 1
+      high: 10
+      low_label: "全くおすすめしない"
+      high_label: "強くおすすめする"
+
+  - title: "詳細フィードバック"
+    type: page_break
+    description: "より詳しくお聞かせください。"
+
+  - title: "改善してほしい点"
+    type: paragraph
+    description: "自由にご記入ください。"
+
+  - title: "次回アンケート希望日"
+    type: date
