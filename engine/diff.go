@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"slices"
 	"strings"
+
+	"github.com/O6lvl4/gformiac/locale"
 )
 
 // ChangeType classifies a diff entry.
@@ -98,13 +100,13 @@ func (d *DiffResult) HasChanges() bool {
 // String formats the diff as a human-readable summary.
 func (d *DiffResult) String() string {
 	if !d.HasChanges() {
-		return "変更なし"
+		return locale.M.NoChanges
 	}
 
 	var lines []string
 
 	if d.InfoChanged {
-		lines = append(lines, "フォーム情報:")
+		lines = append(lines, locale.M.FormInfo)
 		lines = append(lines, d.InfoDetails...)
 	}
 
@@ -124,7 +126,7 @@ func (d *DiffResult) String() string {
 	}
 
 	lines = append(lines, "")
-	lines = append(lines, fmt.Sprintf("合計: +%d ~%d -%d", creates, updates, deletes))
+	lines = append(lines, fmt.Sprintf(locale.M.DiffSummary, creates, updates, deletes))
 
 	return strings.Join(lines, "\n")
 }
@@ -132,7 +134,7 @@ func (d *DiffResult) String() string {
 // NewFormSummary returns a human-readable plan for creating a new form.
 func NewFormSummary(spec *FormSpec) string {
 	var lines []string
-	lines = append(lines, "新規フォーム作成:")
+	lines = append(lines, locale.M.NewFormHeader)
 	lines = append(lines, fmt.Sprintf("  title: %s", spec.Title))
 	if spec.Description != "" {
 		lines = append(lines, fmt.Sprintf("  description: %s", spec.Description))
@@ -142,7 +144,7 @@ func NewFormSummary(spec *FormSpec) string {
 		lines = append(lines, formatNewItem(i, item))
 	}
 	lines = append(lines, "")
-	lines = append(lines, fmt.Sprintf("合計: %d項目を作成", len(spec.Items)))
+	lines = append(lines, fmt.Sprintf(locale.M.CreateSummary, len(spec.Items)))
 	return strings.Join(lines, "\n")
 }
 

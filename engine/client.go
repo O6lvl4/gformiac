@@ -11,6 +11,7 @@ import (
 	"runtime"
 	"time"
 
+	"github.com/O6lvl4/gformiac/locale"
 	"golang.org/x/oauth2"
 	"golang.org/x/oauth2/google"
 	forms "google.golang.org/api/forms/v1"
@@ -25,7 +26,6 @@ type Client struct {
 }
 
 // NewClient creates an authenticated Forms API client.
-// It tries Application Default Credentials first, then falls back to an OAuth2 flow.
 func NewClient(ctx context.Context, credentialsFile, tokenFile string) (*Client, error) {
 	if client, err := tryDefaultCredentials(ctx); err == nil {
 		return client, nil
@@ -48,15 +48,13 @@ func tryDefaultCredentials(ctx context.Context) (*Client, error) {
 func newOAuth2Client(ctx context.Context, credentialsFile, tokenFile string) (*Client, error) {
 	b, err := os.ReadFile(credentialsFile)
 	if err != nil {
-		return nil, fmt.Errorf(
-			"credentials読み込み失敗 (%s)\n\nヒント: gcloud auth application-default login "+
-				"--scopes=%s,https://www.googleapis.com/auth/cloud-platform を実行するか、"+
-				"OAuth2 credentials.json を配置してください", credentialsFile, formsScope)
+		hint := fmt.Sprintf(locale.M.ErrCredsHint, formsScope)
+		return nil, fmt.Errorf("%s (%s): %w%s", locale.M.ErrCredentials, credentialsFile, err, hint)
 	}
 
 	config, err := google.ConfigFromJSON(b, formsScope)
 	if err != nil {
-		return nil, fmt.Errorf("credentials解析失敗: %w", err)
+		return nil, fmt.Errorf("%s: %w", locale.M.ErrCredsParse, err)
 	}
 
 	tok, err := resolveToken(ctx, config, tokenFile)
@@ -66,7 +64,7 @@ func newOAuth2Client(ctx context.Context, credentialsFile, tokenFile string) (*C
 
 	svc, err := forms.NewService(ctx, option.WithHTTPClient(config.Client(ctx, tok)))
 	if err != nil {
-		return nil, fmt.Errorf("Forms API初期化失敗: %w", err)
+		return nil, fmt.Errorf("%s: %w", locale.M.ErrFormsInit, err)
 	}
 	return &Client{svc: svc}, nil
 }
@@ -77,10 +75,10 @@ func resolveToken(ctx context.Context, config *oauth2.Config, tokenFile string) 
 	}
 	tok, err := tokenFromWeb(ctx, config)
 	if err != nil {
-		return nil, fmt.Errorf("認証失敗: %w", err)
+		return nil, fmt.Errorf("%s: %w", locale.M.ErrAuth, err)
 	}
 	if err := saveToken(tokenFile, tok); err != nil {
-		return nil, fmt.Errorf("トークン保存失敗: %w", err)
+		return nil, fmt.Errorf("%s: %w", locale.M.ErrTokenSave, err)
 	}
 	return tok, nil
 }
@@ -89,7 +87,7 @@ func resolveToken(ctx context.Context, config *oauth2.Config, tokenFile string) 
 func (c *Client) Plan(ctx context.Context, formID string, spec *FormSpec, state *State) (*DiffResult, error) {
 	form, err := c.svc.Forms.Get(formID).Context(ctx).Do()
 	if err != nil {
-		return nil, fmt.Errorf("フォーム取得失敗: %w", err)
+		return nil, fmt.Errorf("%s: %w", locale.M.ErrFormGet, err)
 	}
 	return Diff(spec, formToSpec(form), state), nil
 }
@@ -100,14 +98,14 @@ func (c *Client) CreateForm(ctx context.Context, spec *FormSpec) (*State, error)
 		Info: &forms.Info{Title: spec.Title},
 	}).Context(ctx).Do()
 	if err != nil {
-		return nil, fmt.Errorf("フォーム作成失敗: %w", err)
+		return nil, fmt.Errorf("%s: %w", locale.M.ErrFormCreate, err)
 	}
 
 	if requests := specToCreateRequests(spec); len(requests) > 0 {
 		if _, err := c.svc.Forms.BatchUpdate(form.FormId, &forms.BatchUpdateFormRequest{
 			Requests: requests,
 		}).Context(ctx).Do(); err != nil {
-			return nil, fmt.Errorf("フォーム設定失敗: %w", err)
+			return nil, fmt.Errorf("%s: %w", locale.M.ErrFormSetup, err)
 		}
 	}
 
@@ -118,14 +116,14 @@ func (c *Client) CreateForm(ctx context.Context, spec *FormSpec) (*State, error)
 func (c *Client) UpdateForm(ctx context.Context, formID string, spec *FormSpec) (*State, error) {
 	form, err := c.svc.Forms.Get(formID).Context(ctx).Do()
 	if err != nil {
-		return nil, fmt.Errorf("フォーム取得失敗: %w", err)
+		return nil, fmt.Errorf("%s: %w", locale.M.ErrFormGet, err)
 	}
 
 	if requests := specToUpdateRequests(spec, form); len(requests) > 0 {
 		if _, err := c.svc.Forms.BatchUpdate(formID, &forms.BatchUpdateFormRequest{
 			Requests: requests,
 		}).Context(ctx).Do(); err != nil {
-			return nil, fmt.Errorf("フォーム更新失敗: %w", err)
+			return nil, fmt.Errorf("%s: %w", locale.M.ErrFormUpdate, err)
 		}
 	}
 
@@ -136,7 +134,7 @@ func (c *Client) UpdateForm(ctx context.Context, formID string, spec *FormSpec) 
 func (c *Client) ImportForm(ctx context.Context, formID string) (*FormSpec, *State, error) {
 	form, err := c.svc.Forms.Get(formID).Context(ctx).Do()
 	if err != nil {
-		return nil, nil, fmt.Errorf("フォーム取得失敗: %w", err)
+		return nil, nil, fmt.Errorf("%s: %w", locale.M.ErrFormGet, err)
 	}
 	return formToSpec(form), buildState(form), nil
 }
@@ -144,7 +142,7 @@ func (c *Client) ImportForm(ctx context.Context, formID string) (*FormSpec, *Sta
 func (c *Client) fetchState(ctx context.Context, formID string) (*State, error) {
 	form, err := c.svc.Forms.Get(formID).Context(ctx).Do()
 	if err != nil {
-		return nil, fmt.Errorf("フォーム取得失敗: %w", err)
+		return nil, fmt.Errorf("%s: %w", locale.M.ErrFormGet, err)
 	}
 	return buildState(form), nil
 }
@@ -152,7 +150,7 @@ func (c *Client) fetchState(ctx context.Context, formID string) (*State, error) 
 func tokenFromWeb(ctx context.Context, config *oauth2.Config) (*oauth2.Token, error) {
 	listener, err := net.Listen("tcp", "localhost:0")
 	if err != nil {
-		return nil, fmt.Errorf("ローカルサーバー起動失敗: %w", err)
+		return nil, fmt.Errorf("%s: %w", locale.M.ErrLocalServer, err)
 	}
 	port := listener.Addr().(*net.TCPAddr).Port
 	config.RedirectURL = fmt.Sprintf("http://localhost:%d", port)
@@ -164,7 +162,7 @@ func tokenFromWeb(ctx context.Context, config *oauth2.Config) (*oauth2.Token, er
 	defer srv.Close()
 
 	authURL := config.AuthCodeURL("state-token", oauth2.AccessTypeOffline)
-	fmt.Println("ブラウザで認証してください...")
+	fmt.Println(locale.M.AuthBrowser)
 	openBrowser(authURL)
 
 	return waitForToken(ctx, config, codeCh, errCh)
@@ -175,11 +173,11 @@ func callbackHandler(codeCh chan<- string, errCh chan<- error) http.Handler {
 		code := r.URL.Query().Get("code")
 		w.Header().Set("Content-Type", "text/html; charset=utf-8")
 		if code == "" {
-			fmt.Fprintln(w, "<h2>認証失敗</h2><p>認証コードが取得できませんでした。</p>")
-			errCh <- fmt.Errorf("認証コードが見つかりません")
+			fmt.Fprintln(w, locale.M.AuthFailedHTML)
+			errCh <- fmt.Errorf("%s", locale.M.AuthCodeMissing)
 			return
 		}
-		fmt.Fprintln(w, "<h2>認証成功!</h2><p>このタブを閉じてターミナルに戻ってください。</p>")
+		fmt.Fprintln(w, locale.M.AuthSuccessHTML)
 		codeCh <- code
 	})
 }
@@ -193,7 +191,7 @@ func waitForToken(ctx context.Context, config *oauth2.Config, codeCh <-chan stri
 	case <-ctx.Done():
 		return nil, ctx.Err()
 	case <-time.After(2 * time.Minute):
-		return nil, fmt.Errorf("認証タイムアウト（2分）")
+		return nil, fmt.Errorf("%s", locale.M.AuthTimeout)
 	}
 }
 
@@ -208,7 +206,7 @@ func openBrowser(url string) {
 	case "windows":
 		cmd, args = "rundll32", []string{"url.dll,FileProtocolHandler"}
 	default:
-		fmt.Printf("以下のURLをブラウザで開いてください:\n%s\n", url)
+		fmt.Printf(locale.M.AuthOpenURL+"\n", url)
 		return
 	}
 	exec.Command(cmd, append(args, url)...).Start()

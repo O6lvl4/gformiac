@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/O6lvl4/gformiac/engine"
+	"github.com/O6lvl4/gformiac/locale"
 	"github.com/spf13/cobra"
 )
 
@@ -15,12 +16,12 @@ var autoApprove bool
 
 var applyCmd = &cobra.Command{
 	Use:   "apply",
-	Short: "フォーム定義を適用",
+	Short: locale.M.ApplyShort,
 	RunE:  runApply,
 }
 
 func init() {
-	applyCmd.Flags().BoolVar(&autoApprove, "auto-approve", false, "確認をスキップ")
+	applyCmd.Flags().BoolVar(&autoApprove, "auto-approve", false, locale.M.FlagAutoApprove)
 	rootCmd.AddCommand(applyCmd)
 }
 
@@ -35,7 +36,7 @@ func runApply(cmd *cobra.Command, args []string) error {
 
 	state, err := engine.LoadState(stateFile)
 	if err != nil {
-		return fmt.Errorf("状態ファイル読み込み失敗: %w", err)
+		return fmt.Errorf("%s: %w", locale.M.ErrStateRead, err)
 	}
 
 	ctx := context.Background()
@@ -47,8 +48,8 @@ func runApply(cmd *cobra.Command, args []string) error {
 
 func applyNew(ctx context.Context, spec *engine.FormSpec) error {
 	fmt.Println(engine.NewFormSummary(spec))
-	if !autoApprove && !confirm("適用しますか？") {
-		fmt.Println("キャンセルしました")
+	if !autoApprove && !confirm(locale.M.ConfirmApply) {
+		fmt.Println(locale.M.Cancelled)
 		return nil
 	}
 
@@ -57,7 +58,7 @@ func applyNew(ctx context.Context, spec *engine.FormSpec) error {
 		return err
 	}
 
-	fmt.Println("フォーム作成中...")
+	fmt.Println(locale.M.Creating)
 	state, err := client.CreateForm(ctx, spec)
 	if err != nil {
 		return err
@@ -77,7 +78,7 @@ func applyUpdate(ctx context.Context, spec *engine.FormSpec, state *engine.State
 		return err
 	}
 	if !diff.HasChanges() {
-		fmt.Println("変更なし — フォームは最新です")
+		fmt.Println(locale.M.NoChangesLong)
 		return nil
 	}
 	if !confirmDiff(diff) {
@@ -100,8 +101,8 @@ func confirmDiff(diff *engine.DiffResult) bool {
 	if autoApprove {
 		return true
 	}
-	if !confirm("\n適用しますか？") {
-		fmt.Println("キャンセルしました")
+	if !confirm("\n" + locale.M.ConfirmApply) {
+		fmt.Println(locale.M.Cancelled)
 		return false
 	}
 	return true
@@ -109,13 +110,13 @@ func confirmDiff(diff *engine.DiffResult) bool {
 
 func saveAndReport(state *engine.State) error {
 	if err := engine.SaveState(stateFile, state); err != nil {
-		return fmt.Errorf("状態保存失敗: %w", err)
+		return fmt.Errorf("%s: %w", locale.M.ErrStateSave, err)
 	}
 	fmt.Println()
-	fmt.Println("適用完了!")
-	fmt.Printf("  フォームID:  %s\n", state.FormID)
-	fmt.Printf("  回答URL:     %s\n", state.ResponderURL)
-	fmt.Printf("  状態ファイル: %s\n", stateFile)
+	fmt.Println(locale.M.Applied)
+	fmt.Printf(locale.M.FormIDLabel+"\n", state.FormID)
+	fmt.Printf(locale.M.URLLabel+"\n", state.ResponderURL)
+	fmt.Printf(locale.M.StateLabel+"\n", stateFile)
 	return nil
 }
 

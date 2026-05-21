@@ -3,6 +3,8 @@ package engine
 import (
 	"fmt"
 	"strings"
+
+	"github.com/O6lvl4/gformiac/locale"
 )
 
 // ValidationError collects multiple validation failures.
@@ -11,19 +13,18 @@ type ValidationError struct {
 }
 
 func (e *ValidationError) Error() string {
-	return fmt.Sprintf("バリデーションエラー (%d件):\n  %s", len(e.Errors), strings.Join(e.Errors, "\n  "))
+	return fmt.Sprintf(locale.M.ValErrors, len(e.Errors), strings.Join(e.Errors, "\n  "))
 }
 
 // Validate checks a FormSpec against Google Forms API constraints.
-// ref: https://developers.google.com/forms/api/reference/rest/v1/forms
 func Validate(spec *FormSpec) error {
 	var errs []string
 
 	if spec.Title == "" {
-		errs = append(errs, "title は必須です")
+		errs = append(errs, locale.M.ValTitle)
 	}
 	if len(spec.Items) == 0 {
-		errs = append(errs, "items は1つ以上必要です")
+		errs = append(errs, locale.M.ValItems)
 	}
 
 	for i, item := range spec.Items {
@@ -41,15 +42,15 @@ func validateItem(index int, item ItemSpec) []string {
 	var errs []string
 
 	if item.Title == "" && item.Type != ItemPageBreak {
-		errs = append(errs, fmt.Sprintf("%s: title は必須です", prefix))
+		errs = append(errs, fmt.Sprintf(locale.M.ValItemTitle, prefix))
 	}
 
 	if item.Type == "" {
-		return append(errs, fmt.Sprintf("%s: type は必須です", prefix))
+		return append(errs, fmt.Sprintf(locale.M.ValItemType, prefix))
 	}
 
 	if !item.Type.IsValid() {
-		return append(errs, fmt.Sprintf("%s: 不明な type %q (有効値: %s)",
+		return append(errs, fmt.Sprintf(locale.M.ValTypeUnknown,
 			prefix, item.Type, ValidItemTypes()))
 	}
 
@@ -64,16 +65,16 @@ func validateItem(index int, item ItemSpec) []string {
 
 func validateChoice(prefix string, item ItemSpec) []string {
 	if item.Choice == nil {
-		return []string{fmt.Sprintf("%s: type=choice には choice フィールドが必須です", prefix)}
+		return []string{fmt.Sprintf(locale.M.ValChoiceReq, prefix)}
 	}
 
 	var errs []string
 	if !item.Choice.Type.IsValid() {
-		errs = append(errs, fmt.Sprintf("%s: 不明な choice.type %q (有効値: %s)",
+		errs = append(errs, fmt.Sprintf(locale.M.ValChoiceType,
 			prefix, item.Choice.Type, ValidChoiceTypes()))
 	}
 	if len(item.Choice.Options) == 0 {
-		errs = append(errs, fmt.Sprintf("%s: choice.options は1つ以上必要です", prefix))
+		errs = append(errs, fmt.Sprintf(locale.M.ValChoiceOpts, prefix))
 	}
 	errs = append(errs, validateOptionValues(prefix, item.Choice.Options)...)
 	return errs
@@ -83,7 +84,7 @@ func validateOptionValues(prefix string, options []string) []string {
 	var errs []string
 	for j, opt := range options {
 		if opt == "" {
-			errs = append(errs, fmt.Sprintf("%s: choice.options[%d] は空にできません", prefix, j))
+			errs = append(errs, fmt.Sprintf(locale.M.ValChoiceEmpty, prefix, j))
 		}
 	}
 	return errs
@@ -91,7 +92,7 @@ func validateOptionValues(prefix string, options []string) []string {
 
 func validateScale(prefix string, item ItemSpec) []string {
 	if item.Scale == nil {
-		return []string{fmt.Sprintf("%s: type=scale には scale フィールドが必須です", prefix)}
+		return []string{fmt.Sprintf(locale.M.ValScaleReq, prefix)}
 	}
 	return validateScaleRange(prefix, item.Scale)
 }
@@ -99,14 +100,13 @@ func validateScale(prefix string, item ItemSpec) []string {
 func validateScaleRange(prefix string, s *ScaleSpec) []string {
 	var errs []string
 	if s.Low != 0 && s.Low != 1 {
-		errs = append(errs, fmt.Sprintf("%s: scale.low は 0 または 1 のみ (got %d)", prefix, s.Low))
+		errs = append(errs, fmt.Sprintf(locale.M.ValScaleLow, prefix, s.Low))
 	}
 	if s.High < 2 || s.High > 10 {
-		errs = append(errs, fmt.Sprintf("%s: scale.high は 2〜10 の範囲 (got %d)", prefix, s.High))
+		errs = append(errs, fmt.Sprintf(locale.M.ValScaleHigh, prefix, s.High))
 	}
 	if s.Low >= s.High {
-		errs = append(errs, fmt.Sprintf("%s: scale.low (%d) は scale.high (%d) より小さくなければなりません",
-			prefix, s.Low, s.High))
+		errs = append(errs, fmt.Sprintf(locale.M.ValScaleRange, prefix, s.Low, s.High))
 	}
 	return errs
 }

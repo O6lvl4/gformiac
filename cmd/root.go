@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/O6lvl4/gformiac/locale"
 	"github.com/spf13/cobra"
 )
 
@@ -15,12 +16,12 @@ var (
 	credentialsFile string
 	tokenFile       string
 	stateFile       string
+	langFlag        string
 )
 
 var rootCmd = &cobra.Command{
 	Use:     "gformiac",
 	Short:   "Google Forms Infrastructure as Code",
-	Long:    "YAML定義からGoogle Formsを宣言的に管理するIaCツール",
 	Version: Version,
 }
 
@@ -32,8 +33,16 @@ func Execute() {
 }
 
 func init() {
-	rootCmd.PersistentFlags().StringVarP(&specFile, "file", "f", "form.yaml", "フォーム定義ファイル")
-	rootCmd.PersistentFlags().StringVar(&credentialsFile, "credentials", "credentials.json", "OAuth2認証情報ファイル")
-	rootCmd.PersistentFlags().StringVar(&tokenFile, "token", "token.json", "OAuthトークンファイル")
-	rootCmd.PersistentFlags().StringVar(&stateFile, "state", "gformiac.state.json", "状態ファイル")
+	rootCmd.Long = locale.M.CmdLong
+	rootCmd.PersistentPreRun = func(cmd *cobra.Command, args []string) {
+		if langFlag != "" {
+			locale.Set(locale.Lang(langFlag))
+		}
+	}
+
+	rootCmd.PersistentFlags().StringVarP(&specFile, "file", "f", "form.yaml", locale.M.FlagFile)
+	rootCmd.PersistentFlags().StringVar(&credentialsFile, "credentials", "credentials.json", locale.M.FlagCredentials)
+	rootCmd.PersistentFlags().StringVar(&tokenFile, "token", "token.json", locale.M.FlagToken)
+	rootCmd.PersistentFlags().StringVar(&stateFile, "state", "gformiac.state.json", locale.M.FlagState)
+	rootCmd.PersistentFlags().StringVar(&langFlag, "lang", "", locale.M.FlagLang)
 }

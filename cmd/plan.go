@@ -5,12 +5,13 @@ import (
 	"fmt"
 
 	"github.com/O6lvl4/gformiac/engine"
+	"github.com/O6lvl4/gformiac/locale"
 	"github.com/spf13/cobra"
 )
 
 var planCmd = &cobra.Command{
 	Use:   "plan",
-	Short: "変更のプレビュー（dry-run）",
+	Short: locale.M.PlanShort,
 	RunE:  runPlan,
 }
 
@@ -29,7 +30,7 @@ func runPlan(cmd *cobra.Command, args []string) error {
 
 	state, err := engine.LoadState(stateFile)
 	if err != nil {
-		return fmt.Errorf("状態ファイル読み込み失敗: %w", err)
+		return fmt.Errorf("%s: %w", locale.M.ErrStateRead, err)
 	}
 
 	if state == nil {
@@ -53,7 +54,7 @@ func planExisting(spec *engine.FormSpec, state *engine.State) error {
 	}
 
 	if !diff.HasChanges() {
-		fmt.Println("変更なし — フォームは最新です")
+		fmt.Println(locale.M.NoChangesLong)
 		return nil
 	}
 

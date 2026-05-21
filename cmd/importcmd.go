@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"github.com/O6lvl4/gformiac/engine"
+	"github.com/O6lvl4/gformiac/locale"
 	"github.com/spf13/cobra"
 )
 
@@ -12,13 +13,13 @@ var outputFile string
 
 var importCmd = &cobra.Command{
 	Use:   "import [formID]",
-	Short: "既存のGoogle FormをYAML定義にインポート",
+	Short: locale.M.ImportShort,
 	Args:  cobra.ExactArgs(1),
 	RunE:  runImport,
 }
 
 func init() {
-	importCmd.Flags().StringVarP(&outputFile, "output", "o", "", "出力ファイル（未指定時は --file の値）")
+	importCmd.Flags().StringVarP(&outputFile, "output", "o", "", locale.M.FlagOutput)
 	rootCmd.AddCommand(importCmd)
 }
 
@@ -49,15 +50,15 @@ func importOutputPath() string {
 
 func saveImportResult(out string, spec *engine.FormSpec, state *engine.State) error {
 	if err := engine.SaveSpec(out, spec); err != nil {
-		return fmt.Errorf("定義ファイル保存失敗: %w", err)
+		return fmt.Errorf("%s: %w", locale.M.ErrSpecSave, err)
 	}
 	if err := engine.SaveState(stateFile, state); err != nil {
-		return fmt.Errorf("状態ファイル保存失敗: %w", err)
+		return fmt.Errorf("%s: %w", locale.M.ErrStateSave, err)
 	}
 
-	fmt.Printf("インポート完了!\n")
-	fmt.Printf("  定義ファイル: %s\n", out)
-	fmt.Printf("  状態ファイル: %s\n", stateFile)
-	fmt.Printf("  項目数: %d\n", len(spec.Items))
+	fmt.Println(locale.M.Imported)
+	fmt.Printf(locale.M.SpecFileLabel+"\n", out)
+	fmt.Printf(locale.M.StateLabel+"\n", stateFile)
+	fmt.Printf(locale.M.ItemCount+"\n", len(spec.Items))
 	return nil
 }

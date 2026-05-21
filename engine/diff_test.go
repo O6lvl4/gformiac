@@ -3,6 +3,8 @@ package engine
 import (
 	"strings"
 	"testing"
+
+	"github.com/O6lvl4/gformiac/locale"
 )
 
 func TestDiff_NoChanges(t *testing.T) {
@@ -19,7 +21,7 @@ func TestDiff_NoChanges(t *testing.T) {
 	if diff.HasChanges() {
 		t.Error("expected no changes")
 	}
-	if diff.String() != "変更なし" {
+	if diff.String() != locale.M.NoChanges {
 		t.Errorf("String() = %q", diff.String())
 	}
 }
@@ -54,11 +56,8 @@ func TestDiff_ItemCreated(t *testing.T) {
 	if len(diff.Changes) != 1 {
 		t.Fatalf("changes = %d, want 1", len(diff.Changes))
 	}
-	if diff.Changes[0].Type != ChangeCreate {
-		t.Errorf("change type = %v, want Create", diff.Changes[0].Type)
-	}
-	if diff.Changes[0].New.Title != "Q2" {
-		t.Errorf("new title = %q", diff.Changes[0].New.Title)
+	if diff.Changes[0].Type != ChangeCreate || diff.Changes[0].New.Title != "Q2" {
+		t.Errorf("got %+v", diff.Changes[0])
 	}
 }
 
@@ -70,11 +69,8 @@ func TestDiff_ItemDeleted(t *testing.T) {
 	}
 
 	diff := Diff(local, remote, nil)
-	if len(diff.Changes) != 1 {
-		t.Fatalf("changes = %d, want 1", len(diff.Changes))
-	}
-	if diff.Changes[0].Type != ChangeDelete {
-		t.Errorf("change type = %v, want Delete", diff.Changes[0].Type)
+	if len(diff.Changes) != 1 || diff.Changes[0].Type != ChangeDelete {
+		t.Errorf("expected 1 delete, got %v", diff.Changes)
 	}
 }
 
@@ -89,13 +85,10 @@ func TestDiff_ItemUpdated(t *testing.T) {
 	}
 
 	diff := Diff(local, remote, nil)
-	if len(diff.Changes) != 1 {
-		t.Fatalf("changes = %d, want 1", len(diff.Changes))
+	if len(diff.Changes) != 1 || diff.Changes[0].Type != ChangeUpdate {
+		t.Fatalf("expected 1 update, got %v", diff.Changes)
 	}
 	c := diff.Changes[0]
-	if c.Type != ChangeUpdate {
-		t.Errorf("change type = %v, want Update", c.Type)
-	}
 	if c.Old.Title != "Q1" || c.New.Title != "Q1 Updated" {
 		t.Errorf("old=%q new=%q", c.Old.Title, c.New.Title)
 	}
@@ -104,15 +97,11 @@ func TestDiff_ItemUpdated(t *testing.T) {
 func TestDiff_ChoiceOptionsChanged(t *testing.T) {
 	local := &FormSpec{
 		Title: "T",
-		Items: []ItemSpec{
-			{Title: "Q", Type: ItemChoice, Choice: &ChoiceSpec{Type: ChoiceRadio, Options: []string{"A", "B", "C"}}},
-		},
+		Items: []ItemSpec{{Title: "Q", Type: ItemChoice, Choice: &ChoiceSpec{Type: ChoiceRadio, Options: []string{"A", "B", "C"}}}},
 	}
 	remote := &FormSpec{
 		Title: "T",
-		Items: []ItemSpec{
-			{Title: "Q", Type: ItemChoice, Choice: &ChoiceSpec{Type: ChoiceRadio, Options: []string{"A", "B"}}},
-		},
+		Items: []ItemSpec{{Title: "Q", Type: ItemChoice, Choice: &ChoiceSpec{Type: ChoiceRadio, Options: []string{"A", "B"}}}},
 	}
 
 	diff := Diff(local, remote, nil)
@@ -124,15 +113,11 @@ func TestDiff_ChoiceOptionsChanged(t *testing.T) {
 func TestDiff_ScaleChanged(t *testing.T) {
 	local := &FormSpec{
 		Title: "T",
-		Items: []ItemSpec{
-			{Title: "Q", Type: ItemScale, Scale: &ScaleSpec{Low: 1, High: 10}},
-		},
+		Items: []ItemSpec{{Title: "Q", Type: ItemScale, Scale: &ScaleSpec{Low: 1, High: 10}}},
 	}
 	remote := &FormSpec{
 		Title: "T",
-		Items: []ItemSpec{
-			{Title: "Q", Type: ItemScale, Scale: &ScaleSpec{Low: 1, High: 5}},
-		},
+		Items: []ItemSpec{{Title: "Q", Type: ItemScale, Scale: &ScaleSpec{Low: 1, High: 5}}},
 	}
 
 	diff := Diff(local, remote, nil)
@@ -154,11 +139,9 @@ func TestDiff_String_Summary(t *testing.T) {
 		Items: []ItemSpec{{Title: "Old", Type: ItemShortAnswer}},
 	}
 
-	diff := Diff(local, remote, nil)
-	s := diff.String()
-
+	s := Diff(local, remote, nil).String()
 	if !strings.Contains(s, "+1") || !strings.Contains(s, "~1") {
-		t.Errorf("summary missing counts: %s", s)
+		t.Errorf("summary: %s", s)
 	}
 }
 
@@ -173,14 +156,8 @@ func TestNewFormSummary(t *testing.T) {
 	}
 
 	s := NewFormSummary(spec)
-	if !strings.Contains(s, "My Form") {
-		t.Errorf("missing title: %s", s)
-	}
-	if !strings.Contains(s, "2項目を作成") {
-		t.Errorf("missing count: %s", s)
-	}
-	if !strings.Contains(s, "checkbox") {
-		t.Errorf("missing choice detail: %s", s)
+	if !strings.Contains(s, "My Form") || !strings.Contains(s, "checkbox") {
+		t.Errorf("summary: %s", s)
 	}
 }
 

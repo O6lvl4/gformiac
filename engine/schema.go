@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/O6lvl4/gformiac/locale"
 	"gopkg.in/yaml.v3"
 )
 
@@ -93,14 +94,14 @@ type ScaleSpec struct {
 func LoadSpec(path string) (*FormSpec, error) {
 	data, err := os.ReadFile(path)
 	if err != nil {
-		return nil, fmt.Errorf("ファイル読み込み失敗 %s: %w", path, err)
+		return nil, fmt.Errorf("%s %s: %w", locale.M.ErrReadFile, path, err)
 	}
 	var spec FormSpec
 	if err := yaml.Unmarshal(data, &spec); err != nil {
-		return nil, fmt.Errorf("YAML解析失敗: %w", err)
+		return nil, fmt.Errorf("%s: %w", locale.M.ErrParseYAML, err)
 	}
 	if spec.Title == "" {
-		return nil, fmt.Errorf("titleは必須です")
+		return nil, fmt.Errorf("%s", locale.M.ErrTitleReq)
 	}
 	return &spec, nil
 }
